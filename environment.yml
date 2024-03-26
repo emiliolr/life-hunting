@@ -1,0 +1,7 @@
+name: life-hunting
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.12
+prefix: /Users/emiliolr/miniforge3/envs/life-hunting
