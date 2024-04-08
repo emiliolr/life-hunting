@@ -4,4 +4,11 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
+  - jupyterlab
+  - ca-certificates
+  - openssl
+  - statsmodels
+  - certifi
+  - scikit-learn
+  - matplotlib
 prefix: /Users/emiliolr/miniforge3/envs/life-hunting

@@ -1,3 +1,8 @@
 {
-  "gdrive_path" : "/Users/emiliolr/Google Drive/My Drive"
+  "gdrive_path" : "/Users/emiliolr/Google Drive/My Drive",
+  "LIFE_folder" : "LIFE",
+  "datasets_path" : "MRes_datasets",
+  "indiv_data_paths" : {
+    "benitez_lopez2019" : "hunting_effects/benitez_lopez2019/huntmamdata.csv"
+  }
 }
