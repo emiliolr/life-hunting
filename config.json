@@ -3,6 +3,10 @@
   "LIFE_folder" : "LIFE",
   "datasets_path" : "MRes_datasets",
   "indiv_data_paths" : {
-    "benitez_lopez2019" : "hunting_effects/benitez_lopez2019/huntmamdata.csv"
+    "benitez_lopez2019" : "hunting_effects/benitez_lopez2019/huntmamdata.csv",
+    "human_pop_density" : {
+      "base_path" : "socioeconomic/human_population_density",
+      "data_path" : "gpw-v4-population-density-rev11_{}_30_sec_tif/gpw_v4_population_density_rev11_{}_30_sec.tif"
+    }
   }
 }
