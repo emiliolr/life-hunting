@@ -1,0 +1,3 @@
+[submodule "pytaxize"]
+	path = pytaxize
+	url = https://github.com/sckott/pytaxize.git
