@@ -18,4 +18,5 @@ dependencies:
   - basemap
   - cartopy
   - open-clip-torch
+  - pymer4
 prefix: /Users/emiliolr/miniforge3/envs/life-hunting
