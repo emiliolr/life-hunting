@@ -4,11 +4,18 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
-  - jupyterlab
+  - jupyterlab[version='>=3']
   - ca-certificates
   - openssl
   - statsmodels
   - certifi
   - scikit-learn
   - matplotlib
+  - plotly=5.20.0
+  - ipywidgets[version='>=7.6']
+  - jupyter-dash
+  - rasterio
+  - basemap
+  - cartopy
+  - open-clip-torch
 prefix: /Users/emiliolr/miniforge3/envs/life-hunting
