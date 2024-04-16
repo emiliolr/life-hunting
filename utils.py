@@ -1,10 +1,13 @@
 from io import StringIO
 
 import pandas as pd
+import numpy as np
 import torch
 
 from pytaxize import Ids
 from pytaxize import itis
+
+from sklearn.metrics import recall_score
 
 def read_csv_non_utf(filepath):
 
@@ -181,3 +184,109 @@ def get_species_embeddings(species_name_dicts, bioclip_model, tokenizer, full_hi
         species_embeddings[name_dict['scientific_name']]['names_used'] = name_strs
 
     return species_embeddings
+
+def true_skill_statistic(y_pred, y_true, return_spec_sens = False):
+
+    """
+    Compute the true skill statistic (TSS) based on the definition given in Gallego-Zamorano
+    et al. (2020). Designed for binary classication.
+
+    Parameters
+    ----------
+    y_pred : iterable
+        the predicted classifications for a given set of observations
+    y_true : iterable
+        the true labels for a given set of observations
+    return_spec_sens : boolean
+        should we return calculated specificity and sensitivity in addition to the TSS?
+
+    Returns
+    -------
+    tss : float
+        the calculated TSS
+    sensitivity : float
+        the calculated sensitivity
+    specifcity : float
+        the calculated specificity
+    """
+
+    sensitivity = recall_score(y_true, y_pred, pos_label = 1)
+    specificity = recall_score(y_true, y_pred, pos_label = 0) # sensitivity is just recall for the negative class
+    tss = sensitivity + specificity - 1
+
+    if return_spec_sens:
+        return tss, sensitivity, specificity
+
+    return tss
+
+def test_thresholds(y_pred, y_true, precision = 0.05):
+
+    """
+    Test all threshold values between 0 and 1 to find the best threshold based on the TSS.
+    This mirrors the `findOptimum` function in the code from Gallego-Zamorano et al. (2020).
+
+    Paramaters
+    ----------
+    y_pred : iterable
+        the predicted classifications for a given set of observations
+    y_true : iterable
+        the true labels for a given set of observations
+    precision : float
+        the step size for thresholds tested between 0 and 1
+
+    Returns
+    -------
+    opt_thresh : float
+        the optimal threshold based on the TSS
+    metrics : pandas.DataFrame
+        all thresholds and the obtained TSS, sensitivity, and specificity
+    """
+
+    metrics = []
+
+    thresholds = np.arange(0, 1, precision) # tresholds to test
+    for thresh in thresholds:
+        thresh = round(thresh, 4) # fixing weird precision thing with arange...
+        y_hard = (y_pred >= thresh).astype(int) # values greater than the threshold are considered positive hard classifications
+
+        tss, sens, spec = true_skill_statistic(y_hard, y_true, return_spec_sens = True) # compute metrics at this threshold
+        metrics.append([thresh, tss, sens, spec])
+
+    metrics = pd.DataFrame(metrics, columns = ['threshold', 'TSS', 'sensitivity', 'specificity']) # put results into dataframe for return
+    opt_thresh = thresholds[np.argmax(metrics['TSS'])] # grab the optimal threshold based on the TSS
+
+    return opt_thresh, metrics
+
+def ratios_to_DI_cats(ratios, category_names = False):
+
+    """
+    Convert abundance ratios to defaunation categories, as defined in
+    Benitez-Lopez et al. (2019).
+
+    Paramaters
+    ----------
+    ratios : iterable
+        the abundance ratio to be converted to defaunation categories
+    category_names : boolean
+        should we return category names rather than numeric values?
+
+    Returns
+    -------
+    DI_categories : numpy.array
+        the defaunation categories corresponding to the supplied abundance ratios
+    """
+
+    DI = 1 - ratios # go from abundance ratio to percentage lost due to hunting
+    DI_categories = DI.copy()
+
+    # Defaunation categories, following Benitez-Lopez et al. (2019)
+    DI_categories[0.1 >= DI] = 0
+    DI_categories[(0.7 > DI) & (DI > 0.1)] = 1
+    DI_categories[DI >= 0.7] = 2
+
+    # Change to category names rather than numeric values
+    if category_names:
+        categories = {0 : 'low', 1 : 'medium', 2 : 'high'}
+        DI_categories = np.array([categories[cat] for cat in DI_categories])
+
+    return DI_categories
