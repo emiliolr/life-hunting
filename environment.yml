@@ -19,4 +19,5 @@ dependencies:
   - cartopy
   - open-clip-torch
   - pymer4
+  - geopandas
 prefix: /Users/emiliolr/miniforge3/envs/life-hunting

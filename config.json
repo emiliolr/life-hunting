@@ -8,6 +8,11 @@
       "base_path" : "socioeconomic/human_population_density",
       "data_path" : "gpw-v4-population-density-rev11_{}_30_sec_tif/gpw_v4_population_density_rev11_{}_30_sec.tif",
       "avail_years" : [2000, 2005, 2010, 2015, 2020]
+    },
+    "protected_areas" : {
+      "base_path" : "socioeconomic/protected_areas",
+      "data_path" : "WDPA_Apr2024_Public_shp_{}/WDPA_Apr2024_Public_shp-polygons.shp",
+      "subsets" : [0, 1, 2]
     }
   }
 }
