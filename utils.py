@@ -290,3 +290,24 @@ def ratios_to_DI_cats(ratios, category_names = False):
         DI_categories = np.array([categories[cat] for cat in DI_categories])
 
     return DI_categories
+
+# From: https://discuss.pytorch.org/t/how-do-i-check-the-number-of-parameters-of-a-model/4325/9
+def count_parameters(model):
+
+    """
+    A helper function to get the number of parameters in a torch model.
+
+    Parameters
+    ----------
+    model : torch.NN.module
+        a PyTorch model
+
+    Returns
+    -------
+    num_params : integer
+        the number of parameters in the supplied torch model
+    """
+
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    return num_params
