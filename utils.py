@@ -8,6 +8,7 @@ from pytaxize import Ids
 from pytaxize import itis
 
 from sklearn.metrics import recall_score
+from sklearn.preprocessing import StandardScaler
 
 def read_csv_non_utf(filepath):
 
@@ -311,3 +312,128 @@ def count_parameters(model):
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     return num_params
+
+def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf):
+
+    """
+    A helper function to split out the datasets for the binary (zero) and continuous
+    (nonzero) models of a hunting effects hurdle model.
+
+    Paramaters
+    ----------
+    pp_data : pandas.DataFrame
+        a dataframe containing preprocessed hunting effects data
+    pred : boolean
+        will these be used for prediction? if False, labels (y_zero, y_nonzero)
+        are not returned
+    outlier_cutoff : float
+        a positive number that indicates the largest abundance ratio to keep
+        in the datasets
+
+    Returns
+    -------
+    X_zero : pandas.DataFrame
+        a dataframe containing the predictors for the zero model
+    X_nonzero : pandas.DataFrame
+        a dataframe containing the predictors for the nonzero model
+    y_zero : numpy.array
+        an array containing the binary labels for the zero model
+    y_nonzero : numpy.array
+        an array containing the continuous response ratios for the zero model
+
+    """
+
+    # Grabbing needed predictors for each model
+    indicator_columns = ['Country', 'Species', 'Study']
+    nonzero_columns = ['BM', 'DistKm', 'DistKm^2', 'PopDens', 'PopDens^2', 'BMxDistKm']
+    zero_columns = ['BM', 'DistKm', 'DistKm^2', 'PopDens', 'Stunting', 'Reserve']
+
+    X_nonzero = pp_data[nonzero_columns].copy(deep = True)
+    X_zero = pp_data[zero_columns].copy(deep = True)
+
+    for col in indicator_columns:
+        X_nonzero = pd.concat((X_nonzero, pp_data.filter(like = col)), axis = 1)
+        X_zero = pd.concat((X_zero, pp_data.filter(like = col)), axis = 1)
+
+    # Extracting the inputs/outputs for each of the models in the case where we have labels
+    if not pred:
+        ratio = pp_data['ratio'].values
+        nonzero_mask = (ratio != 0)
+        outlier_mask = ratio < outlier_cutoff # only keeping values smaller than cutoff - ratio is always positive!
+
+        X_nonzero = X_nonzero[nonzero_mask & outlier_mask].copy(deep = True)
+        X_zero = X_zero[outlier_mask].copy(deep = True)
+
+        y_zero = (ratio == 0).astype(int)[outlier_mask] # the positive class corresponds to local extirpation!
+        y_nonzero = np.log(ratio[nonzero_mask & outlier_mask].copy())
+
+        return X_zero, y_zero, X_nonzero, y_nonzero
+
+    return X_zero, X_nonzero
+
+def preprocess_data(ben_lop_data, include_indicators = False, include_categorical = False,
+                    standardize = False, log_trans_cont = False):
+
+    """
+    A helper function to preprocess the hunting effects dataset, including predictors.
+
+    Paramaters
+    ----------
+    ben_lop_data : pandas.DataFrame
+        a dataframe containing the hunting effects dataset (predictors and response)
+    include_indicators : boolean
+        should we create indicator columns for categorical predictors?
+    include_categorical : boolean
+        should we mantain categorical predictors?
+    standardize : boolean
+        should we standardize (center and scale) the continuous predictors?
+    log_trans_cont : boolean
+        should we log10 transform the continuous predictors?
+
+    Returns
+    -------
+    pp_data : pandas.DataFrame
+        a dataframe containing the preprocessed dataset
+    """
+
+    assert not include_indicators or not include_categorical, 'Cannot include indicators and categorical variables at the same time.'
+
+    # Defining the variables needed
+    indicator_columns = ['Country', 'Species', 'Study']
+    continuous_columns = ['BM', 'DistKm', 'PopDens', 'Stunting']
+    special_columns = ['Reserve']
+    response_column = 'ratio'
+
+    # Grabbing just the continuous variables
+    pp_data = ben_lop_data[continuous_columns + special_columns].copy(deep = True)
+
+    # Adding cross terms, indicators, and quadratic terms
+    pp_data['DistKm^2'] = pp_data['DistKm'] ** 2
+    pp_data['PopDens^2'] = pp_data['PopDens'] ** 2
+    pp_data['BMxDistKm'] = pp_data['BM'] * pp_data['DistKm']
+    pp_data['Reserve'] = (pp_data['Reserve'] == 'Yes').astype(int)
+
+    # Optionally log10 transforming continuoys predictors
+    if log_trans_cont:
+        for col in continuous_columns:
+            pp_data.loc[pp_data[col] == 0, col] = 0.1 # ensuring we don't run into issues with log
+            pp_data[col] = np.log10(pp_data[col].copy(deep = True))
+
+    # Optionally standardizing continuous predictors
+    if standardize:
+        reserve = pp_data['Reserve'].copy(deep = True)
+        pp_data_scaled = StandardScaler().fit_transform(pp_data)
+        pp_data = pd.DataFrame(pp_data_scaled, index = pp_data.index, columns = pp_data.columns)
+        pp_data['Reserve'] = reserve
+
+    # Optionally adding indicator (or straight categorical) variables for different groups present in data
+    if include_indicators:
+        pp_data = pd.concat((pp_data, ben_lop_data[indicator_columns].copy(deep = True)), axis = 1)
+        pp_data = pd.get_dummies(pp_data, dtype = float, drop_first = True, columns = indicator_columns)
+    elif include_categorical:
+        pp_data = pd.concat((pp_data, ben_lop_data[indicator_columns].copy(deep = True)), axis = 1)
+
+    # Add back in the response variable
+    pp_data[response_column] = ben_lop_data[response_column]
+
+    return pp_data
