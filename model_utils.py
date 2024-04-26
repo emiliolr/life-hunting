@@ -96,22 +96,24 @@ def k_fold_cross_val(model, data, num_folds = 5, class_metrics = [], reg_metrics
     Paramaters
     ----------
     model : sklearn model-like
-
+        a model that behaves like an sklearn model (i.e., has fit and predict
+        functions)
     data : pandas.DataFrame
-
+        a dataframe holding the preprocessed predictors and the response variable
     num_folds : integer
-
+        the number of folds to use for k-fold cross-validation
     class_metrics : list
-
+        the classification metrics to record (will consider each class the positive
+        class in turn)
     reg_metrics : list
-
+        the regression metrics to record
     verbose : boolean
-
+        should we print incremental updates during function execution?
 
     Returns
     -------
     metric_dict : dictionary
-
+        a dictionary that holds all obtained metrics for each cross-validation split
     """
 
     kfold = KFold(n_splits = num_folds, random_state = 1693, shuffle = True)
