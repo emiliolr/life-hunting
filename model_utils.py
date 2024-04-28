@@ -86,7 +86,7 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
 
         return y_pred
 
-def k_fold_cross_val(model, data, num_folds = 5, class_metrics = [], reg_metrics = [], verbose = True):
+def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metrics = None, verbose = True):
 
     """
     A custom k-fold cross validation function that is compatible with a two-stage
@@ -116,6 +116,15 @@ def k_fold_cross_val(model, data, num_folds = 5, class_metrics = [], reg_metrics
         a dictionary that holds all obtained metrics for each cross-validation split
     """
 
+    # Setting mutable defaults
+    assert (class_metrics is not None) or (reg_metrics is not None), 'Please provide at least one classification or regression metrics.'
+
+    if class_metrics is None:
+        class_metrics = []
+    if reg_metrics is None:
+        reg_metrics = []
+
+    # Establishing k-fold parameters and structures to save results
     kfold = KFold(n_splits = num_folds, random_state = 1693, shuffle = True)
 
     classes = {0 : 'low', 1 : 'medium', 2 : 'high'}
@@ -126,6 +135,7 @@ def k_fold_cross_val(model, data, num_folds = 5, class_metrics = [], reg_metrics
     for m in reg_metrics:
         metric_dict[m] = []
 
+    # Running the k-fold cross-validation
     for i, (train_idx, test_idx) in enumerate(kfold.split(data)):
         if verbose:
             print(f'Fold {i}:')
