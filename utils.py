@@ -437,3 +437,58 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
     pp_data[response_column] = ben_lop_data[response_column]
 
     return pp_data
+
+def match_to_closest_year(avail_years, study_years):
+
+    """
+    A helper function to match to study years to the closest available predictor
+    years.
+
+    Paramaters
+    ----------
+    avail_years : list
+        the years for which we have datasets
+    study_years : list
+        the extracted study years, as integers
+
+    Returns
+    -------
+    matched_years : numpy.array
+        the closest match year amongst available years for each study
+    """
+
+    study_years = np.array(study_years).reshape(-1, 1)
+    study_years = np.repeat(study_years, len(avail_years), axis = 1)
+
+    avail_years = np.array(avail_years).reshape(1, -1)
+
+    diff = np.abs(study_years - avail_years)
+    closest_idx = np.argmin(diff, axis = 1)
+    closest_idx = [[0 for i in range(len(closest_idx))], list(closest_idx)]
+
+    matched_years = avail_years[closest_idx[0], closest_idx[1]]
+
+    return matched_years
+
+def extract_year(ref_str):
+
+    """
+    A helper function to extract the year value from the reference column.
+    CURRENTLY ONLY TESTED ON BENITEZ-LOPEZ ET AL. (2019)!
+
+    Paramaters
+    ----------
+    ref_str : string
+        the reference string (e.g., 'Luz-Ricca et al., 2019')
+
+    Returns
+    -------
+    year : integer
+        the extracted study year
+    """
+
+    year = ref_str.split(' ')[-1].strip()
+    year = ''.join([c for c in year if c.isnumeric()])
+    year = int(year)
+
+    return year
