@@ -313,7 +313,7 @@ def count_parameters(model):
 
     return num_params
 
-def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf):
+def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, extirp_pos = True):
 
     """
     A helper function to split out the datasets for the binary (zero) and continuous
@@ -329,6 +329,9 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf):
     outlier_cutoff : float
         a positive number that indicates the largest abundance ratio to keep
         in the datasets
+    extirp_pos : boolean
+        should we code a local extirpation event as the positive class, i.e.,
+        extirpated = 1 and extant = 0?
 
     Returns
     -------
@@ -364,7 +367,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf):
         X_nonzero = X_nonzero[nonzero_mask & outlier_mask].copy(deep = True)
         X_zero = X_zero[outlier_mask].copy(deep = True)
 
-        y_zero = (ratio == 0).astype(int)[outlier_mask] # the positive class corresponds to local extirpation!
+        y_zero = (ratio == 0).astype(int) if extirp_pos else (ratio != 0).astype(int)
+        y_zero = y_zero[outlier_mask]
         y_nonzero = np.log(ratio[nonzero_mask & outlier_mask].copy())
 
         return X_zero, y_zero, X_nonzero, y_nonzero

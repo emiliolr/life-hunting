@@ -62,14 +62,19 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
     of a two-stage hurdle model.
     """
 
-    def __init__(self, zero_model, nonzero_model, prob_thresh = 0.5, data_args = {}):
+    def __init__(self, zero_model, nonzero_model, prob_thresh = 0.5, extirp_pos = True, data_args = {}):
         self.zero_model = zero_model
         self.nonzero_model = nonzero_model
+
         self.prob_thresh = prob_thresh
+        self.extirp_pos = extirp_pos
         self.data_args = data_args
 
     def fit(self, pp_data):
-        X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, **self.data_args)
+        X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data,
+                                                                         pred = False,
+                                                                         extirp_pos = self.extirp_pos,
+                                                                         **self.data_args)
 
         self.nonzero_model.fit(X_nonzero, y_nonzero)
         self.zero_model.fit(X_zero, y_zero)
@@ -77,12 +82,12 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
         return self
 
     def predict(self, pp_data):
-        X_zero, X_nonzero = get_zero_nonzero_datasets(pp_data, pred = True)
+        X_zero, X_nonzero = get_zero_nonzero_datasets(pp_data, extirp_pos = self.extirp_pos, pred = True)
 
-        y_pred_zero = self.zero_model.predict_proba(X_zero)[ : , 1] >= self.prob_thresh # hard classification, 1 = local extirpation
+        y_pred_zero = self.zero_model.predict_proba(X_zero)[ : , 1] >= self.prob_thresh # hard classification
         y_pred_nonzero = self.nonzero_model.predict(X_nonzero)
 
-        y_pred = (~y_pred_zero).astype(int) * y_pred_nonzero # if y_pred_zero >= prob_thresh, this is a local extirpation so our prediction should be zero
+        y_pred = (~y_pred_zero).astype(int) * y_pred_nonzero if self.extirp_pos else y_pred_zero.astype(int) * y_pred_nonzero
 
         return y_pred
 
