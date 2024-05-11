@@ -13,6 +13,11 @@
       "base_path" : "socioeconomic/protected_areas",
       "data_path" : "WDPA_Apr2024_Public_shp_{}/WDPA_Apr2024_Public_shp-polygons.shp",
       "subsets" : [0, 1, 2]
+    },
+    "elton_traits" : {
+      "base_path" : "species_traits/eltontraits1.0",
+      "birds" : "BirdFuncDat.txt",
+      "mammals" : "MamFuncDat.txt"
     }
   }
 }

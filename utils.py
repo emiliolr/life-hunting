@@ -10,7 +10,7 @@ from pytaxize import itis
 from sklearn.metrics import recall_score
 from sklearn.preprocessing import StandardScaler
 
-def read_csv_non_utf(filepath):
+def read_csv_non_utf(filepath, **kwargs):
 
     """
     A wrapper function to handle cases where a CSV contains non-UTF-8 characters.
@@ -19,6 +19,8 @@ def read_csv_non_utf(filepath):
     ----------
     filepath : string
         the path to CSV file
+    **kwargs
+        passed on to pandas.read_csv
 
     Returns
     -------
@@ -34,7 +36,7 @@ def read_csv_non_utf(filepath):
             data += line
 
     # Turning the string into a pandas dataframe
-    dataset = pd.read_csv(StringIO(data))
+    dataset = pd.read_csv(StringIO(data), **kwargs)
 
     return dataset
 
