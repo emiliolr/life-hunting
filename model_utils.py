@@ -94,9 +94,9 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
 def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metrics = None, verbose = True):
 
     """
-    A custom k-fold cross validation function that is compatible with a two-stage
-    hurdle model. This will handle transformation of predictions into defaunation
-    categories.
+    A standard random-split k-fold cross validation function that is compatible with
+    a two-stage hurdle model. This will handle transformation of predictions into
+    defaunation categories.
 
     Paramaters
     ----------

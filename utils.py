@@ -315,7 +315,8 @@ def count_parameters(model):
 
     return num_params
 
-def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, extirp_pos = True):
+def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, extirp_pos = True,
+                              zero_columns = None, nonzero_columns = None):
 
     """
     A helper function to split out the datasets for the binary (zero) and continuous
@@ -334,6 +335,10 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     extirp_pos : boolean
         should we code a local extirpation event as the positive class, i.e.,
         extirpated = 1 and extant = 0?
+    zero_columns : list
+        a list of columns to extract for fitting the binary extirpation model
+    nonzero_columns : list
+        a list of columns to extract for fitting the continuous model
 
     Returns
     -------
@@ -345,13 +350,14 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         an array containing the binary labels for the zero model
     y_nonzero : numpy.array
         an array containing the continuous response ratios for the zero model
-
     """
 
     # Grabbing needed predictors for each model
-    indicator_columns = ['Country', 'Species', 'Study']
-    nonzero_columns = ['BM', 'DistKm', 'DistKm^2', 'PopDens', 'PopDens^2', 'BMxDistKm']
-    zero_columns = ['BM', 'DistKm', 'DistKm^2', 'PopDens', 'Stunting', 'Reserve']
+    indicator_columns = ['Country', 'Species', 'Study', 'Family']
+    if nonzero_columns is None:
+        nonzero_columns = ['BM', 'DistKm', 'PopDens']
+    if zero_columns is None:
+        zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'Reserve']
 
     X_nonzero = pp_data[nonzero_columns].copy(deep = True)
     X_zero = pp_data[zero_columns].copy(deep = True)
@@ -405,21 +411,18 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
     assert not include_indicators or not include_categorical, 'Cannot include indicators and categorical variables at the same time.'
 
     # Defining the variables needed
-    indicator_columns = ['Country', 'Species', 'Study']
+    indicator_columns = ['Country', 'Species', 'Study', 'Family']
     continuous_columns = ['BM', 'DistKm', 'PopDens', 'Stunting']
     special_columns = ['Reserve']
     response_column = 'ratio'
 
-    # Grabbing just the continuous variables
+    # Grabbing just the fixed-effects predictors
     pp_data = ben_lop_data[continuous_columns + special_columns].copy(deep = True)
 
-    # Adding cross terms, indicators, and quadratic terms
-    pp_data['DistKm^2'] = pp_data['DistKm'] ** 2
-    pp_data['PopDens^2'] = pp_data['PopDens'] ** 2
-    pp_data['BMxDistKm'] = pp_data['BM'] * pp_data['DistKm']
+    # Turning reserve into an indicator variable
     pp_data['Reserve'] = (pp_data['Reserve'] == 'Yes').astype(int)
 
-    # Optionally log10 transforming continuoys predictors
+    # Optionally log10 transforming continuous predictors
     if log_trans_cont:
         for col in continuous_columns:
             pp_data.loc[pp_data[col] == 0, col] = 0.1 # ensuring we don't run into issues with log
