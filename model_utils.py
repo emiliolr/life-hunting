@@ -14,11 +14,12 @@ class PymerModelWrapper:
     A wrapper class to make pymer models behave like sklearn models.
     """
 
-    def __init__(self, pymer_model, formula, family, control_str = ''):
+    def __init__(self, pymer_model, formula, family, control_str = '', use_rfx = True):
         self.model_type = pymer_model
         self.formula = formula
         self.family = family
         self.control_str = control_str
+        self.use_rfx = use_rfx
 
     def fit(self, X, y):
         data = self.combine_X_y(X, y)
@@ -27,7 +28,7 @@ class PymerModelWrapper:
         self.model.fit(REML = True, control = self.control_str, summarize = False)
 
     def predict(self, X):
-        preds = self.model.predict(X, use_rfx = True, skip_data_checks = True, verify_predictions = False)
+        preds = self.model.predict(X, use_rfx = self.use_rfx, skip_data_checks = True, verify_predictions = False)
         preds = np.asarray(preds)
 
         if self.family == 'binomial':
@@ -38,7 +39,7 @@ class PymerModelWrapper:
     def predict_proba(self, X):
         assert self.family == 'binomial', f'Cannot make probability predictions with a {self.family} model.'
 
-        preds = self.model.predict(X, use_rfx = True, skip_data_checks = True, verify_predictions = False)
+        preds = self.model.predict(X, use_rfx = self.use_rfx, skip_data_checks = True, verify_predictions = False)
         preds = np.asarray(preds)
 
         #  formatting the predictions like in sklearn

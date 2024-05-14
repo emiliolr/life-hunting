@@ -514,6 +514,36 @@ def extract_year(ref_str):
 
     return year
 
+def get_train_test_split(len_dataset, train_size = 0.7):
+
+    """
+    A function to define a shared train/test split for all machine learning modelling.
+
+    Paramaters
+    ----------
+    len_dataset : integer
+        the length of the dataset to split
+    train_size : float
+        the proportion of data to use in the train set (between 0 and 1)
+
+    Returns
+    -------
+    idxs : dictionary
+        a dictionary with the train and test indices as entries
+    """
+
+    np.random.seed(1693)
+
+    idxs = np.arange(0, len_dataset)
+    np.random.shuffle(idxs)
+
+    train_idxs = idxs[ : int(0.7 * len(idxs))]
+    test_idxs = idxs[int(0.7 * len(idxs)) : ]
+
+    idxs = {'train' : train_idxs, 'test' : test_idxs}
+
+    return idxs
+
 if __name__ == '__main__':
     data_path = '/Users/emiliolr/Google Drive/My Drive/LIFE/MRes_datasets/hunting_effects/benitez_lopez2019/huntmamdata.csv'
     ben_lop2019 = read_csv_non_utf(data_path)

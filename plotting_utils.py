@@ -40,3 +40,34 @@ def plot_ratio_confusion_matrix(true_classes, pred_classes):
     fig, ax = plt.gcf(), plt.gca()
 
     return fig, ax
+
+def plot_model_coefficients(feature_names, coefficient_values):
+
+    """
+    A helper function to visualize model coefficients for generalized linear models.
+
+    Paramaters
+    ----------
+    feature_names : list-like
+        a list of feature names
+    coefficient_values : list-like
+        a list of the fitted coefficient values
+
+    Returns
+    -------
+    fig : matplotlib.Figure
+        the figure object
+    ax : matplotlib.Axes
+        the axes object
+    """
+
+    plt.scatter(feature_names, coefficient_values, s = 100, edgecolor = 'black', color = 'maroon', zorder = 100) # scatter plot at coefficient values
+
+    plt.axhline(0, color = 'black')
+    plt.vlines(feature_names, 0, coefficient_values, color = 'black', zorder = 0) # adding sticks to plot
+
+    plt.ylabel('Coefficient Estimate', weight = 'bold')
+
+    fig, ax = plt.gcf(), plt.gca()
+
+    return fig, ax
