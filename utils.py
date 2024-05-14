@@ -384,7 +384,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     return X_zero, X_nonzero
 
 def preprocess_data(ben_lop_data, include_indicators = False, include_categorical = False,
-                    standardize = False, log_trans_cont = False):
+                    standardize = False, log_trans_cont = False, train_test_idxs = None):
 
     """
     A helper function to preprocess the hunting effects dataset, including predictors.
@@ -431,8 +431,20 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
     # Optionally standardizing continuous predictors
     if standardize:
         reserve = pp_data['Reserve'].copy(deep = True)
-        pp_data_scaled = StandardScaler().fit_transform(pp_data)
-        pp_data = pd.DataFrame(pp_data_scaled, index = pp_data.index, columns = pp_data.columns)
+
+        #  if we were supplied train indices, only using those stats for standardization
+        if train_test_idxs is not None:
+            scaler = StandardScaler()
+            pp_train_scaled = scaler.fit_transform(pp_data.loc[train_test_idxs['train']])
+            pp_test_scaled = scaler.transform(pp_data.loc[train_test_idxs['test']])
+
+            pp_data_scaled = np.vstack((pp_train_scaled, pp_test_scaled))
+        else:
+            pp_data_scaled = StandardScaler().fit_transform(pp_data)
+
+        idx = pp_data.index if train_test_idxs is None else np.concatenate((train_test_idxs['train'], train_test_idxs['test']))
+        pp_data = pd.DataFrame(pp_data_scaled, index = idx, columns = pp_data.columns)
+        pp_data = pp_data.sort_index()
         pp_data['Reserve'] = reserve
 
     # Optionally adding indicator (or straight categorical) variables for different groups present in data
@@ -501,3 +513,17 @@ def extract_year(ref_str):
     year = int(year)
 
     return year
+
+if __name__ == '__main__':
+    data_path = '/Users/emiliolr/Google Drive/My Drive/LIFE/MRes_datasets/hunting_effects/benitez_lopez2019/huntmamdata.csv'
+    ben_lop2019 = read_csv_non_utf(data_path)
+
+    np.random.seed(1693)
+    idxs = np.arange(0, len(ben_lop2019))
+    np.random.shuffle(idxs)
+    train_size = 0.7
+    train_idxs = idxs[ : int(0.7 * len(idxs))]
+    test_idxs = idxs[int(0.7 * len(idxs)) : ]
+
+    pp_data = preprocess_data(ben_lop2019, include_indicators = True, standardize = True,
+                              log_trans_cont = True, train_test_idxs = {'train' : train_idxs, 'test' : test_idxs})
