@@ -7,8 +7,9 @@ import torch
 from pytaxize import Ids
 from pytaxize import itis
 
-from sklearn.metrics import recall_score
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+
+from custom_metrics import true_skill_statistic
 
 def read_csv_non_utf(filepath, **kwargs):
 
@@ -188,40 +189,6 @@ def get_species_embeddings(species_name_dicts, bioclip_model, tokenizer, full_hi
 
     return species_embeddings
 
-def true_skill_statistic(y_pred, y_true, return_spec_sens = False):
-
-    """
-    Compute the true skill statistic (TSS) based on the definition given in Gallego-Zamorano
-    et al. (2020). Designed for binary classication.
-
-    Parameters
-    ----------
-    y_pred : iterable
-        the predicted classifications for a given set of observations
-    y_true : iterable
-        the true labels for a given set of observations
-    return_spec_sens : boolean
-        should we return calculated specificity and sensitivity in addition to the TSS?
-
-    Returns
-    -------
-    tss : float
-        the calculated TSS
-    sensitivity : float
-        the calculated sensitivity
-    specifcity : float
-        the calculated specificity
-    """
-
-    sensitivity = recall_score(y_true, y_pred, pos_label = 1)
-    specificity = recall_score(y_true, y_pred, pos_label = 0) # sensitivity is just recall for the negative class
-    tss = sensitivity + specificity - 1
-
-    if return_spec_sens:
-        return tss, sensitivity, specificity
-
-    return tss
-
 def test_thresholds(y_pred, y_true, precision = 0.05):
 
     """
@@ -362,12 +329,21 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     if zero_columns is None:
         zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'Reserve']
 
-    X_nonzero = pp_data[nonzero_columns].copy(deep = True)
-    X_zero = pp_data[zero_columns].copy(deep = True)
+    X_nonzero = pp_data[[]].copy(deep = True)
+    X_zero = pp_data[[]].copy(deep = True)
 
+    #  filling in like this ensures this works for polynomial features as well
+    for col in nonzero_columns:
+        X_nonzero = pd.concat((X_nonzero, pp_data.filter(like = col)), axis = 1)
+    for col in zero_columns:
+        X_zero = pd.concat((X_zero, pp_data.filter(like = col)), axis = 1)
     for col in indicator_columns:
         X_nonzero = pd.concat((X_nonzero, pp_data.filter(like = col)), axis = 1)
         X_zero = pd.concat((X_zero, pp_data.filter(like = col)), axis = 1)
+
+    #  making sure to toss any duplicate columns
+    X_nonzero = X_nonzero.loc[ : , ~X_nonzero.columns.duplicated()].copy(deep = True)
+    X_zero = X_zero.loc[ : , ~X_zero.columns.duplicated()].copy(deep = True)
 
     # Extracting the inputs/outputs for each of the models in the case where we have labels
     if not pred:
@@ -432,7 +408,7 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
     pp_data['Reserve'] = (pp_data['Reserve'] == 'Yes').astype(int)
 
     # Optionally adding a polynomial basis expansion
-    if polynomial_features > 0:
+    if polynomial_features > 1:
         reserve = pp_data['Reserve'].copy(deep = True)
 
         poly = PolynomialFeatures(polynomial_features, include_bias = False)

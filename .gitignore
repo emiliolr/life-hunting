@@ -1,6 +1,12 @@
 *.ipynb_checkpoints/
 *__pycache__/
 *.DS_Store
+
 *.pkl
+*.png
+
+*.txt
+!requirements.txt
+
 *.json
 !config.json
