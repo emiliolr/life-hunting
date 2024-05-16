@@ -74,9 +74,7 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
         self.data_args = data_args
 
     def fit(self, pp_data):
-        X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data,
-                                                                         pred = False,
-                                                                         extirp_pos = self.extirp_pos,
+        X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, extirp_pos = self.extirp_pos,
                                                                          **self.data_args)
 
         if self.verbose:
@@ -90,7 +88,7 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
         return self
 
     def predict(self, pp_data):
-        X_zero, X_nonzero = get_zero_nonzero_datasets(pp_data, extirp_pos = self.extirp_pos, pred = True)
+        X_zero, X_nonzero = get_zero_nonzero_datasets(pp_data, extirp_pos = self.extirp_pos, pred = True, **self.data_args)
 
         y_pred_zero = self.zero_model.predict_proba(X_zero)[ : , 1] >= self.prob_thresh # hard classification
         y_pred_nonzero = self.nonzero_model.predict(X_nonzero)

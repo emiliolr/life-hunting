@@ -8,7 +8,7 @@ from pytaxize import Ids
 from pytaxize import itis
 
 from sklearn.metrics import recall_score
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 
 def read_csv_non_utf(filepath, **kwargs):
 
@@ -316,7 +316,7 @@ def count_parameters(model):
     return num_params
 
 def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, extirp_pos = True,
-                              zero_columns = None, nonzero_columns = None):
+                              zero_columns = None, nonzero_columns = None, indicator_columns = None):
 
     """
     A helper function to split out the datasets for the binary (zero) and continuous
@@ -339,6 +339,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         a list of columns to extract for fitting the binary extirpation model
     nonzero_columns : list
         a list of columns to extract for fitting the continuous model
+    indicator_columns : list
+        a list of columns to use as indicator variables or random effects
 
     Returns
     -------
@@ -353,7 +355,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     """
 
     # Grabbing needed predictors for each model
-    indicator_columns = ['Country', 'Species', 'Study', 'Family']
+    if indicator_columns is None:
+        indicator_columns = ['Country', 'Species', 'Study', 'Family']
     if nonzero_columns is None:
         nonzero_columns = ['BM', 'DistKm', 'PopDens']
     if zero_columns is None:
@@ -384,7 +387,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     return X_zero, X_nonzero
 
 def preprocess_data(ben_lop_data, include_indicators = False, include_categorical = False,
-                    standardize = False, log_trans_cont = False, train_test_idxs = None):
+                    standardize = False, log_trans_cont = False, polynomial_features = 0,
+                    train_test_idxs = None):
 
     """
     A helper function to preprocess the hunting effects dataset, including predictors.
@@ -401,6 +405,11 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
         should we standardize (center and scale) the continuous predictors?
     log_trans_cont : boolean
         should we log10 transform the continuous predictors?
+    polynomial_features : integer
+        the degree of the polynomial expansion to apply to continuous predictors
+    train_test_idxs : list
+        a list of training indices to ensure preprocessing only uses statistics
+        from training data
 
     Returns
     -------
@@ -411,8 +420,8 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
     assert not include_indicators or not include_categorical, 'Cannot include indicators and categorical variables at the same time.'
 
     # Defining the variables needed
-    indicator_columns = ['Country', 'Species', 'Study', 'Family']
-    continuous_columns = ['BM', 'DistKm', 'PopDens', 'Stunting']
+    indicator_columns = ['Country', 'Species', 'Study', 'Family', 'Order', 'Region', 'Diet']
+    continuous_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime', 'LivestockBio', 'Literacy']
     special_columns = ['Reserve']
     response_column = 'ratio'
 
@@ -421,6 +430,17 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
 
     # Turning reserve into an indicator variable
     pp_data['Reserve'] = (pp_data['Reserve'] == 'Yes').astype(int)
+
+    # Optionally adding a polynomial basis expansion
+    if polynomial_features > 0:
+        reserve = pp_data['Reserve'].copy(deep = True)
+
+        poly = PolynomialFeatures(polynomial_features, include_bias = False)
+        pp_data_poly = poly.fit_transform(pp_data.drop(columns = ['Reserve']))
+
+        pp_data = pd.DataFrame(pp_data_poly, index = pp_data.index, columns = poly.get_feature_names_out())
+        pp_data = pp_data.sort_index()
+        pp_data['Reserve'] = reserve
 
     # Optionally log10 transforming continuous predictors
     if log_trans_cont:
