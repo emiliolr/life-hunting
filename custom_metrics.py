@@ -20,7 +20,7 @@ def root_median_squared_error(y_true, y_pred):
         the computed root median squared error
     """
 
-    r_med_se = np.sqrt(np.median(np.square(test_ratios - pred_ratios)))
+    r_med_se = np.sqrt(np.median(np.square(y_true - y_pred)))
 
     return r_med_se
 
