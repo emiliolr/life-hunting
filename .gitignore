@@ -4,6 +4,7 @@
 
 *.pkl
 *.png
+*.log
 
 *.txt
 !requirements.txt
