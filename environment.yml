@@ -11,16 +11,17 @@ dependencies:
   - certifi
   - scikit-learn
   - matplotlib
-  - plotly=5.20.0
+  - plotly::plotly=5.20.0
   - ipywidgets[version='>=7.6']
   - jupyter-dash
   - rasterio
   - basemap
   - cartopy
   - open-clip-torch
-  - pymer4
+  - ejolly::pymer4
   - geopandas
   - lightning
   - torchgeo
   - albumentations
+  - flaml
 prefix: /Users/emiliolr/miniforge3/envs/life-hunting

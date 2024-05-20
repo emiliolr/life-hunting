@@ -71,8 +71,9 @@ def get_classification_report(true_DI_cats, pred_DI_cats, save_dir = None, model
         plt.close()
 
     # Optionally saving the metric report
-    with open(os.path.join(base_dir, 'classification_report.txt'), 'w') as f:
-        f.write(save_str)
+    if save_dir is not None:
+        with open(os.path.join(base_dir, 'classification_report.txt'), 'w') as f:
+            f.write(save_str)
 
 def get_regression_report(true_ratios, pred_ratios, save_dir = None, model_name = None,
                           printout = True):
@@ -156,8 +157,9 @@ def get_regression_report(true_ratios, pred_ratios, save_dir = None, model_name 
         plt.close()
 
     # Optionally saving the metric report
-    with open(os.path.join(base_dir, 'regression_report.txt'), 'w') as f:
-        f.write(save_str)
+    if save_dir is not None:
+        with open(os.path.join(base_dir, 'regression_report.txt'), 'w') as f:
+            f.write(save_str)
 
 if __name__ == '__main__':
     import numpy as np
