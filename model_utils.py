@@ -73,7 +73,10 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
         self.verbose = verbose
         self.data_args = data_args
 
-    def fit(self, pp_data, fit_args = {}):
+    def fit(self, pp_data, fit_args = None):
+        if fit_args is None:
+            fit_args = {'zero' : {}, 'nonzero' : {}}
+
         X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data,
                                                                          pred = False,
                                                                          extirp_pos = self.extirp_pos,
@@ -128,7 +131,7 @@ def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metri
     """
 
     # Setting mutable defaults
-    assert (class_metrics is not None) or (reg_metrics is not None), 'Please provide at least one classification or regression metrics.'
+    assert (class_metrics is not None) or (reg_metrics is not None), 'Please provide at least one classification or regression metric.'
 
     if class_metrics is None:
         class_metrics = []

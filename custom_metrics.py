@@ -1,6 +1,6 @@
 import numpy as np
 
-from sklearn.metrics import recall_score
+from sklearn.metrics import recall_score, balanced_accuracy_score
 
 def root_median_squared_error(y_true, y_pred):
 
@@ -57,3 +57,18 @@ def true_skill_statistic(y_pred, y_true, return_spec_sens = False):
         return tss, sensitivity, specificity
 
     return tss
+
+def balanced_accuracy_FLAML(X_val, y_val, estimator, labels, X_train, y_train,
+                            weight_val = None, weight_train = None, *args):
+
+    """
+    A wrapper function to port balanced accuracy to FLAML. See this page for details
+    on parameters and returns: https://microsoft.github.io/FLAML/docs/Use-Cases/Task-Oriented-AutoML/#optimization-metric.
+    """
+
+    start = time.time()
+    y_pred = estimator.predict(X_val)
+    pred_time = (time.time() - start) / len(X_val)
+    val_acc = 1.0 - balanced_accuracy_score(y_val, y_pred)
+
+    return val_acc, {'val_acc' : val_acc, 'pred_time' : pred_time}
