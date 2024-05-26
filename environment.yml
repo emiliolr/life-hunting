@@ -24,4 +24,6 @@ dependencies:
   - torchgeo
   - albumentations
   - flaml
+  - imbalanced-learn
+  - verde
 prefix: /Users/emiliolr/miniforge3/envs/life-hunting

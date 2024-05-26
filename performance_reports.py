@@ -76,7 +76,7 @@ def get_classification_report(true_DI_cats, pred_DI_cats, save_dir = None, model
             f.write(save_str)
 
 def get_regression_report(true_ratios, pred_ratios, save_dir = None, model_name = None,
-                          printout = True):
+                          printout = True, upper_thresh = 1):
 
     """
     Produce a performance report for regressing abundance ratios with all relevant
@@ -94,6 +94,8 @@ def get_regression_report(true_ratios, pred_ratios, save_dir = None, model_name 
         the model name, which will be used as the subdirectory for saving results
     printout : boolean
         should we print results and display plots?
+    upper_thresh : float
+        the upper limit for ratios to plot in the histogram/scatterplot
 
     Returns
     -------
@@ -133,7 +135,7 @@ def get_regression_report(true_ratios, pred_ratios, save_dir = None, model_name 
         print(r_med_se_str)
 
     # Plotting the distribution of ratios for the 0-1 range
-    fig, ax = plot_ratio_distribution_comparison(true_ratios, pred_ratios, upper_thresh = 1)
+    fig, ax = plot_ratio_distribution_comparison(true_ratios, pred_ratios, upper_thresh = upper_thresh)
 
     if save_dir is not None:
         plt.savefig(os.path.join(base_dir, 'ratio_distribution_0-1.png'),
@@ -145,7 +147,7 @@ def get_regression_report(true_ratios, pred_ratios, save_dir = None, model_name 
         plt.close()
 
     # Plotting a scatterplot of ratios for the 0-1 range
-    fig, ax = plot_ratio_scatterplot(true_ratios, pred_ratios, true_upper_thresh = 1)
+    fig, ax = plot_ratio_scatterplot(true_ratios, pred_ratios, upper_thresh = upper_thresh)
 
     if save_dir is not None:
         plt.savefig(os.path.join(base_dir, 'ratio_scatter_0-1.png'),
