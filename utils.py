@@ -540,6 +540,61 @@ def get_train_test_split(len_dataset, train_size = 0.7):
 
     return idxs
 
+def direct_train_test(data, train_size = 0.7, task = 'classification', already_pp = False,
+                      train_test_idxs = None):
+
+    """
+    A helper function to get train/test data for direct regression or classification.
+
+    Paramaters
+    ----------
+    data : pandas.DataFrame
+        the dataset to split into train/test sets
+    train_size : float
+        the portion of data to assign to the train set
+    task : string
+        either 'classification' or 'regression'
+    already_pp : boolean
+        is the data already preprocessed?
+    train_test_idxs : dictionary
+        the training and testing indices, if already computed
+
+    Returns
+    -------
+    X_train : pandas.DataFrame
+        the training predictors
+    y_train : numpy.array
+        the training response
+    X_test : pandas.DataFrame
+        the testing predictors
+    y_test : numpy.array
+        the testing response
+    """
+
+    # Getting the train/test split, if not supplied
+    if train_test_idxs is None:
+        train_test_idxs = get_train_test_split(len(data), train_size = train_size)
+
+    # Pre-processing data, if not already preprocessed
+    if not already_pp:
+        pp_data = preprocess_data(data, include_indicators = False, standardize = True, log_trans_cont = False,
+                                  polynomial_features = 0, train_test_idxs = train_test_idxs)
+    else:
+        pp_data = data.copy(deep = True)
+
+    pp_data['DI_cat'] = ratios_to_DI_cats(pp_data['ratio'])
+
+    # Splitting the dataset into train/test sets
+    train_data, test_data = pp_data.iloc[train_test_idxs['train']], pp_data.iloc[train_test_idxs['test']]
+
+    # Putting into the format that FLAML wants
+    target_col = 'ratio' if task == 'regression' else 'DI_cat'
+
+    X_train, X_test = train_data.drop(columns = ['ratio', 'DI_cat']), test_data.drop(columns = ['ratio', 'DI_cat'])
+    y_train, y_test = train_data[target_col].values, test_data[target_col].values
+
+    return X_train, y_train, X_test, y_test
+
 if __name__ == '__main__':
     data_path = '/Users/emiliolr/Google Drive/My Drive/LIFE/MRes_datasets/hunting_effects/benitez_lopez2019/huntmamdata.csv'
     ben_lop2019 = read_csv_non_utf(data_path)
