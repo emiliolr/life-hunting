@@ -384,8 +384,8 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
     polynomial_features : integer
         the degree of the polynomial expansion to apply to continuous predictors
     train_test_idxs : list
-        a list of training indices to ensure preprocessing only uses statistics
-        from training data
+        a dictionary of training/testing indices to ensure preprocessing only uses
+        information (e.g., statistics) from training data
 
     Returns
     -------
@@ -431,8 +431,8 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
         #  if we were supplied train indices, only using those stats for standardization
         if train_test_idxs is not None:
             scaler = StandardScaler()
-            pp_train_scaled = scaler.fit_transform(pp_data.loc[train_test_idxs['train']])
-            pp_test_scaled = scaler.transform(pp_data.loc[train_test_idxs['test']])
+            pp_train_scaled = scaler.fit_transform(pp_data.iloc[train_test_idxs['train']])
+            pp_test_scaled = scaler.transform(pp_data.iloc[train_test_idxs['test']])
 
             pp_data_scaled = np.vstack((pp_train_scaled, pp_test_scaled))
         else:

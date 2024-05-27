@@ -153,7 +153,7 @@ def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metri
     for i, (train_idx, test_idx) in enumerate(kfold.split(data)):
         if verbose:
             print(f'Fold {i}:')
-        train_data, test_data = data.loc[train_idx].copy(deep = True), data.loc[test_idx].copy(deep = True)
+        train_data, test_data = data.iloc[train_idx].copy(deep = True), data.iloc[test_idx].copy(deep = True)
 
         with warnings.catch_warnings(action = 'ignore'):
             if verbose:
@@ -164,7 +164,7 @@ def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metri
         # Turn predictions into DI categories
         if verbose:
             print('  getting test metrics')
-        test_ratios = data['ratio'].loc[test_idx].copy(deep = True)
+        test_ratios = data['ratio'].iloc[test_idx].copy(deep = True)
         pred_ratios = y_pred.copy()
         pred_ratios[pred_ratios != 0] = np.exp(pred_ratios[pred_ratios != 0]) # don't need to back-transform predicted extirpations - not RRs!
 

@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 
 from sklearn.metrics import recall_score, balanced_accuracy_score
