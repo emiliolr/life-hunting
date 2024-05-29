@@ -2,7 +2,41 @@ import time
 
 import numpy as np
 
-from sklearn.metrics import recall_score, balanced_accuracy_score
+from sklearn.metrics import recall_score, balanced_accuracy_score, mean_absolute_error
+
+def mean_absolute_error_range(y_true, y_pred, lower_bound = 0, upper_bound = 1):
+
+    """
+    A function to compute the mean absolute error for a specified range of true
+    values for the response variable.
+
+    Paramaters
+    ----------
+    y_true : numpy.array
+        an of true continuous labels
+    y_pred : numpy.array
+        an array of predicted continuous labels
+    lower_bound : float
+        the lower bound on indices to keep (based on labels)
+    upper_bound : float
+        the upper bound on indices to keep (based on labels)
+
+    Returns
+    -------
+    mae_range : float
+        the mean absolute error for the given range
+    pct_kept : float
+        the percent of data points kept after subsetting to the given range
+    """
+
+    bound_mask = (y_true >= lower_bound) & (y_true <= upper_bound)
+    y_true_sub = y_true[bound_mask]
+    y_pred_sub = y_pred[bound_mask]
+
+    mae_range = mean_absolute_error(y_true_sub, y_pred_sub)
+    pct_kept = len(y_true_sub) / len(y_true)
+
+    return mae_range, pct_kept
 
 def root_median_squared_error(y_true, y_pred):
 

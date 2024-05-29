@@ -198,7 +198,7 @@ def test_thresholds(y_pred, y_true, precision = 0.05):
     Paramaters
     ----------
     y_pred : iterable
-        the predicted classifications for a given set of observations
+        the predicted PROBABILITY classifications for a given set of observations
     y_true : iterable
         the true labels for a given set of observations
     precision : float
