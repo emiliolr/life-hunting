@@ -27,25 +27,50 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
     Parameters
     ----------
     model : sklearn-like
+        a model that behaves like an sklearn model (i.e., has fit and predict
+        functions)
     data : pandas.DataFrame
+        a dataframe holding the raw predictors and the response variable (i.e.,
+        not yet preprocessed)
     block_type : string
+        the type of cross-validation blocking to perform, one of 'spatial' or 'group,'
+        defaults to random splitting
     num_folds : integer
+        the number of folds to use for k-fold cross-validation
     group_col : string
+        the column in the dataframe to use for group membership in group blocking
     spatial_spacing : integer
+        the size of grid cells in degrees for spatial blocking
     fit_args : dictionary
+        keyword arguments to pass to the model during fitting
     pp_args : dictionary
+        keyword arguments to pass to the preprocessing function
     class_metrics : dictionary
+        classification metrics to use (either 'overall' or 'per-class'), each entry
+        should be a dictionary with 'function' and 'kwargs' entries
     reg_metrics : dictionary
+        regression metrics to use, each entry should be a dictionary with
+        'function' and 'kwargs' entries
     verbose : boolean
+        should we print out progress indicators during cross-validation?
     random_state : integer
+        the random state used in all interior random operations
     sklearn_submodels : boolean
+        are we using a hurdle model with sklearn sub-models?
     back_transform : boolean
+        should we back-transform from response ratios to abundance ratios during
+        prediction?
     direct : string
+        the type of direct model being used, either 'classification' or 'regression'
     tune_hurdle_thresh : boolean
+        should we tune the probability threshold for the zero model component of
+        the hurdle model?
 
     Returns
     -------
     metric_dict : dictionary
+        the obtained test metrics for each fold, each passed in metric gets one
+        entry
     """
 
     # Setting mutable defaults
@@ -192,13 +217,19 @@ def format_cv_results(metric_dict_sub, class_metrics, reg_metrics, result_type =
     Parameters
     ----------
     metrics_dict_sub : dictionary
+        a subset of the metric dictionary post-cross-validation
     class_metrics : dictionary
+        the classification metrics used (see 'run_cross_val' above)
     reg_metrics : dictionary
+        the regression metrics used (see 'run_cross_val' above)
     results_type : string
+        the type of results contained in 'metrics_dict_sub,' one of 'per_class'
+        (classification), 'overall' (classification), or 'regression'
 
     Returns
     -------
     results : pandas.DataFrame
+        a formatted dataframe with the same information as 'metrics_dict_sub'
     """
 
     # Re-structuring per-class classification metrics
@@ -236,23 +267,33 @@ def format_cv_results(metric_dict_sub, class_metrics, reg_metrics, result_type =
 
     return results
 
-def save_cv_results(metrics_dict, model_name, fp, class_metrics = None, reg_metrics = None):
+def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_metrics = None, reg_metrics = None):
 
     """
-    A helper function to wrap the re-formatting of the results dictionary and saving the resulting
-    dataframe as a CSV file after cross-validation.
+    A helper function to wrap the re-formatting and aggregation of the results dictionary
+    obtained via cross-validation. Results are also saved as a CSV file.
 
     Parameters
     ----------
     metrics_dict : dictionary
+        the metric dictionary recieved from cross-validation
     model_name : string
-    fp : string
+        the name of the model used
+    save_fp : string
+        a filepath for saving the formatted results as a CSV
+    cross_val_params : dictionary
+        the parameters used for cross-validation, should have entries for 'num_folds,'
+        'block_type,' 'spatial_spacing,' and 'group_col'
     class_metrics : dictionary
+        the classification metrics used (see 'run_cross_val' above)
     reg_metrics : dictionary
+        the regression metrics used (see 'run_cross_val' above)
 
     Returns
     -------
     final_results : pandas.DataFrame
+        the final results aggregated (mean and standard deviation across folds)
+        in a dataframe format
     """
 
     # Setting mutable defaults
@@ -304,12 +345,18 @@ def save_cv_results(metrics_dict, model_name, fp, class_metrics = None, reg_metr
     final_results['date'] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
     final_results['model_name'] = model_name
 
+    #  adding info about the cross-val setup
+    final_results['num_folds'] = cross_val_params['num_folds']
+    final_results['block_type'] = cross_val_params['block_type'] if cross_val_params['block_type'] is not None else 'random'
+    final_results['spatial_spacing'] = cross_val_params['spatial_spacing'] if cross_val_params['block_type'] == 'spatial' else np.nan
+    final_results['group_col'] = cross_val_params['group_col'] if cross_val_params['block_type'] == 'group' else np.nan
+
     # Saving to the inputted file
-    if os.path.isfile(fp):
-        existing_results = pd.read_csv(fp)
+    if os.path.isfile(save_fp):
+        existing_results = pd.read_csv(save_fp)
         all_results = pd.concat((existing_results, final_results))
-        all_results.to_csv(fp, index = False)
+        all_results.to_csv(save_fp, index = False)
     else:
-        final_results.to_csv(fp, index = False)
+        final_results.to_csv(save_fp, index = False)
 
     return final_results
