@@ -100,7 +100,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
         kfold = GroupKFold(n_splits = num_folds)
     elif block_type == 'spatial':
         if verbose:
-            print(f'Using spatial blocking on with spacing {spatial_spacing} degrees')
+            print(f'Using spatial blocking with spacing {spatial_spacing} degrees')
         groups = None
         kfold = BlockKFold(spacing = spatial_spacing, n_splits = num_folds, shuffle = True, random_state = random_state)
 
@@ -125,6 +125,8 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
         pp_data = preprocess_data(data, standardize = True, train_test_idxs = train_test_idxs, **pp_args)
 
         # Fitting/predicting differently for direct classification/regression vs. hurdle models
+        if verbose:
+            print('  training model')
         if direct is None:
             train_data, test_data = pp_data.iloc[train_idx].copy(deep = True), pp_data.iloc[test_idx].copy(deep = True)
 
@@ -135,8 +137,6 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
 
             #  train the model
             with warnings.catch_warnings(action = 'ignore'):
-                if verbose:
-                    print('  training model')
                 model.fit(train_data, fit_args)
 
             #  optionally tuning the probability threshold for the zero component of the hurdle model

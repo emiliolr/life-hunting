@@ -100,6 +100,25 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
 
         return y_pred
 
+class TwoStageNovelModel(RegressorMixin, BaseEstimator):
+
+    def __init__(self, classifier, regressor_decrease, regressor_increase, classes = None):
+        self.classifier = classifier
+        self.regressor_decline = regressor_decrease
+        self.regressor_increase = regressor_increase
+
+        self.classes = {'extirpated' : 0, 'decrease' : 1, 'no_effect' : 2,
+                        'increase' : 3}
+
+    def fit(self):
+        pass
+
+    def predict(self):
+        pass
+
+    def predict_proba(self):
+        pass
+
 def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metrics = None, verbose = True):
 
     """
