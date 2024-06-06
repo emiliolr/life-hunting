@@ -4,8 +4,7 @@ import pandas as pd
 import numpy as np
 import torch
 
-from pytaxize import Ids
-from pytaxize import itis
+from pytaxize import Ids, itis
 
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 
@@ -41,7 +40,7 @@ def read_csv_non_utf(filepath, **kwargs):
 
     return dataset
 
-def get_species_names(scientific_name):
+def get_species_names(scientific_name = None, itis_id = None):
 
     """
     A function to extract the relevant taxonomic information for a given species from ITIS;
@@ -51,6 +50,8 @@ def get_species_names(scientific_name):
     ----------
     scientific_name : string
         the scientific name (binomial) for the species of interest
+    itis_id : integer
+        the ITIS ID for the species
 
     Returns
     -------
@@ -58,31 +59,38 @@ def get_species_names(scientific_name):
         a dictionary containing the scientific, full taxonomic, and common names
     """
 
+    assert (scientific_name is not None) or (itis_id is not None), 'Please supply a scientific name or ITIS ID.'
+
     # Info to get from ITIS
     ranks_to_include = ['Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
 
     # Setting up data structure to hold obtained data
     name_dict = {}
-    name_dict['scientific_name'] = scientific_name
+    if scientific_name is not None:
+        name_dict['scientific_name'] = scientific_name
 
     # Getting the species ID for ITIS
-    tax_id = Ids(scientific_name)
-    tax_id.itis(type = 'scientific')
-    ids = tax_id.extract_ids()
-    sel_id = int(ids[scientific_name][0]) # it seems like subspecies entries generally come after plain species...
+    if itis_id is None:
+        tax_id = Ids(scientific_name)
+        tax_id.itis(type = 'scientific')
+        ids = tax_id.extract_ids()
+        itis_id = int(ids[scientific_name][0]) # it seems like subspecies entries generally come after plain species...
 
     # Extracting the full taxonomic hierarchy for the species and adding to the dictionary
-    tax_hier = itis.hierarchy_full(sel_id, as_dataframe = True)
+    tax_hier = itis.hierarchy_full(itis_id, as_dataframe = True)
 
     for rank in ranks_to_include:
         rank_value = tax_hier[tax_hier['rankName'] == rank]['taxonName'].values[0]
         if rank == 'Species':
+            if scientific_name is None:
+                name_dict['scientific_name'] = rank_value
+                
             rank_value = rank_value.split(' ')[1]
 
         name_dict[rank] = rank_value
 
     # Get the species' common name (if it has one) and add to the dictionary
-    common = itis.common_names(sel_id)
+    common = itis.common_names(itis_id)
 
     if len(common) == 0:
         print(f'{scientific_names} has no common names recorded in ITIS')
@@ -142,7 +150,6 @@ def format_species_name_CLIP(name_dict, full_hierarchy = True, common_name = Tru
         name_strs = [name_str + ' ' + name_dict['scientific_name']]
 
     return name_strs
-
 
 def get_species_embeddings(species_name_dicts, bioclip_model, tokenizer, full_hierarchy = True, common_name = True):
 
