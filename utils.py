@@ -40,7 +40,7 @@ def read_csv_non_utf(filepath, **kwargs):
 
     return dataset
 
-def get_species_names(scientific_name = None, itis_id = None):
+def get_species_names(scientific_name = None, itis_id = None, level = 'Species'):
 
     """
     A function to extract the relevant taxonomic information for a given species from ITIS;
@@ -52,6 +52,8 @@ def get_species_names(scientific_name = None, itis_id = None):
         the scientific name (binomial) for the species of interest
     itis_id : integer
         the ITIS ID for the species
+    level : string
+        the taxonomic level of the record, e.g., "species" or "genus"
 
     Returns
     -------
@@ -65,7 +67,7 @@ def get_species_names(scientific_name = None, itis_id = None):
     ranks_to_include = ['Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
 
     # Setting up data structure to hold obtained data
-    name_dict = {}
+    name_dict = {'scientific_name' : None}
     if scientific_name is not None:
         name_dict['scientific_name'] = scientific_name
 
@@ -79,21 +81,31 @@ def get_species_names(scientific_name = None, itis_id = None):
     # Extracting the full taxonomic hierarchy for the species and adding to the dictionary
     tax_hier = itis.hierarchy_full(itis_id, as_dataframe = True)
 
+    flag = True
     for rank in ranks_to_include:
-        rank_value = tax_hier[tax_hier['rankName'] == rank]['taxonName'].values[0]
-        if rank == 'Species':
-            if scientific_name is None:
-                name_dict['scientific_name'] = rank_value
-                
-            rank_value = rank_value.split(' ')[1]
+        if flag:
+            rank_value = tax_hier[tax_hier['rankName'] == rank]['taxonName']
+            rank_value = rank_value.iloc[0]
 
-        name_dict[rank] = rank_value
+            if rank == 'Species':
+                if scientific_name is None:
+                    name_dict['scientific_name'] = rank_value
+
+                rank_value = rank_value.split(' ')[1]
+
+            name_dict[rank] = rank_value
+        else:
+            name_dict[rank] = None
+
+        #  flag to stop recording values since we've reached the level of the record
+        if rank.lower() == level.lower():
+            flag = False
 
     # Get the species' common name (if it has one) and add to the dictionary
     common = itis.common_names(itis_id)
 
-    if len(common) == 0:
-        print(f'{scientific_names} has no common names recorded in ITIS')
+    if len(common) == 0 or common[0] is None:
+        print(f'ID {itis_id} has no common names recorded in ITIS')
         com_names = []
     else:
         com_names = [d['commonName'].lower() for d in common if d['language'] == 'English']
@@ -129,20 +141,20 @@ def format_species_name_CLIP(name_dict, full_hierarchy = True, common_name = Tru
     if full_hierarchy or common_name:
         # Adding the full hierarchical name to the name string
         if full_hierarchy:
-            hier_str = ' '.join([name_dict[r] for r in ranks_to_include])
+            hier_str = ' '.join([name_dict[r] for r in ranks_to_include if name_dict[r] is not None])
             name_str += ' ' + hier_str
 
         # Adding the common name/s to the name string
         if common_name:
             com_names = name_dict['common_names']
-            assert len(com_names) > 0, f'{name_dict["scientific_name"]} has no common names recorded in ITIS'
+            assert len(com_names) > 0, 'This record has no common names in ITIS'
 
             if not full_hierarchy:
                 name_strs = [name_str + ' ' + name_dict['scientific_name'] + ' with common name ' + name for name in com_names]
             else:
                 name_strs = [name_str + ' with common name ' + name for name in com_names]
 
-        # Esnuring that we always pass back a list
+        # Ensuring that we always pass back a list
         if full_hierarchy and not common_name:
             name_strs = [name_str]
     else:
