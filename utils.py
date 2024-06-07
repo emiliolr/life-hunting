@@ -105,7 +105,6 @@ def get_species_names(scientific_name = None, itis_id = None, level = 'Species')
     common = itis.common_names(itis_id)
 
     if len(common) == 0 or common[0] is None:
-        print(f'ID {itis_id} has no common names recorded in ITIS')
         com_names = []
     else:
         com_names = [d['commonName'].lower() for d in common if d['language'] == 'English']
@@ -208,7 +207,7 @@ def get_species_embeddings(species_name_dicts, bioclip_model, tokenizer, full_hi
             mean_embedding = text_features.mean(axis = 0) # get the mean embedding when there are multiple common names
 
         species_embeddings[name] = {}
-        species_embeddings[name]['embedding'] = mean_embedding.numpy()
+        species_embeddings[name]['embedding'] = mean_embedding.tolist()
         species_embeddings[name]['names_used'] = name_strs
 
     return species_embeddings

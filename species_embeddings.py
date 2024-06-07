@@ -3,6 +3,8 @@ import json
 import copy
 from itertools import chain
 
+from tqdm import tqdm
+
 import pandas as pd
 import numpy as np
 
@@ -71,9 +73,8 @@ def read_dataset():
 def get_higher_level_dicts(higher_tax_level):
     higher_tax_full = []
 
-    for name in higher_tax_level[ : 3]:
+    for name in tqdm(higher_tax_level):
         name = name.split(' ')[0]
-        print(name)
 
         #  special cases
         if name == 'Cebus':
@@ -95,12 +96,10 @@ def get_higher_level_dicts(higher_tax_level):
 
         level = itis.rank_name(sel_id)['rankName'] # checking the taxonomic level
         level_to_pass = level.replace('Sub', '')
-        print(level, sel_id)
 
         #  cleaning up the output to reflect the fact that we only have genus info
         tax_names = get_species_names(itis_id = sel_id, level = level_to_pass)
         higher_tax_full.append(tax_names)
-        print()
 
     return higher_tax_full
 
@@ -120,17 +119,8 @@ def get_species_dicts(full_species, species_resolved):
 
     # Querying ITIS for full taxonomic hierachy using our existing function
     full_names = []
-    i = 0
-    for species, itis_id in species_itis.items():
-
-        if i > 3:
-            break
-
-        print(species, itis_id)
-        print()
-
+    for species, itis_id in tqdm(species_itis.items()):
         full_names.append(get_species_names(species, itis_id))
-        i += 1
 
     return full_names
 
@@ -142,14 +132,15 @@ def main():
     ben_lop2019_species = ben_lop2019['Species'].apply(multi_species_extraction)
     ben_lop2019_species = set(chain(*list(ben_lop2019_species)))
 
-    # Resolving scientific names
     full_species = [s for s in ben_lop2019_species if '*' not in s]
     higher_tax_level = [s for s in ben_lop2019_species if '*' in s]
 
     # Getting full names - GENUS (or higher level) ONLY CASE!
+    print(f'Getting full names for {len(higher_tax_level)} higher taxonomic levels')
     higher_tax_full = get_higher_level_dicts(higher_tax_level)
 
     # Getting full names - FULL SPECIES CASE!
+    print(f'Getting full names for {len(full_species)} species')
     species_resolved = gn.resolve(full_species, best_match_only = True, source = [3])
     species_full = get_species_dicts(full_species, species_resolved)
 
@@ -158,6 +149,7 @@ def main():
     tokenizer = open_clip.get_tokenizer('hf-hub:imageomics/bioclip')
 
     # Processing w/BioCLIP and saving the resulting embeddings
+    print(f'Getting BioCLIP embeddings for {len(higher_tax_full) + len(species_full)} records')
     species_embeddings = get_species_embeddings(species_full, model, tokenizer, full_hierarchy = True,
                                                 common_name = True)
     higher_tax_embeddings = get_species_embeddings(higher_tax_full, model, tokenizer, full_hierarchy = True,
@@ -168,11 +160,9 @@ def main():
     for entry in higher_tax_embeddings.keys():
         all_embeddings[entry] = higher_tax_embeddings[entry]
 
-    for n, d in all_embeddings.items():
-        print(n)
-        print(f'Embedding size: {d["embedding"].shape}')
-        print(d['names_used'])
-        print()
+    #  saving the unified embedding dict
+    with open('embeddings/bioclip_embeddings.json', 'w') as f:
+        json.dump(all_embeddings, f)
 
 if __name__ == '__main__':
     main()
