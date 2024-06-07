@@ -127,7 +127,8 @@ def format_species_name_CLIP(name_dict, full_hierarchy = True, common_name = Tru
     full_hierarchy : boolean
         include the full taxonomic name in the name string?
     common_name : boolean
-        include the common name/s in the name string?
+        include the common name/s in the name string? if no common names are present,
+        nothing is added to the string
 
     Returns
     -------
@@ -145,17 +146,16 @@ def format_species_name_CLIP(name_dict, full_hierarchy = True, common_name = Tru
             name_str += ' ' + hier_str
 
         # Adding the common name/s to the name string
+        com_names = name_dict['common_names']
         if common_name:
-            com_names = name_dict['common_names']
-            assert len(com_names) > 0, 'This record has no common names in ITIS'
-
-            if not full_hierarchy:
-                name_strs = [name_str + ' ' + name_dict['scientific_name'] + ' with common name ' + name for name in com_names]
-            else:
-                name_strs = [name_str + ' with common name ' + name for name in com_names]
+            if len(com_names) > 0:
+                if not full_hierarchy:
+                    name_strs = [name_str + ' ' + name_dict['scientific_name'] + ' with common name ' + name for name in com_names]
+                else:
+                    name_strs = [name_str + ' with common name ' + name for name in com_names]
 
         # Ensuring that we always pass back a list
-        if full_hierarchy and not common_name:
+        if full_hierarchy and (not common_name or len(com_names) == 0):
             name_strs = [name_str]
     else:
         # Simply returning the scientific (binomial) name
@@ -163,7 +163,8 @@ def format_species_name_CLIP(name_dict, full_hierarchy = True, common_name = Tru
 
     return name_strs
 
-def get_species_embeddings(species_name_dicts, bioclip_model, tokenizer, full_hierarchy = True, common_name = True):
+def get_species_embeddings(species_name_dicts, bioclip_model, tokenizer, full_hierarchy = True,
+                           common_name = True, names_to_use = None):
 
     """
     Get species embeddings based on a textual name (scientific, common, full taxonomic,
@@ -181,6 +182,8 @@ def get_species_embeddings(species_name_dicts, bioclip_model, tokenizer, full_hi
         include the full taxonomic name in the name string?
     common_name : boolean
         include the common name/s in the name string?
+    names_to_use : list
+        the names to use instead of the scientific names in species_name_dicts
 
     Returns
     -------
@@ -190,9 +193,11 @@ def get_species_embeddings(species_name_dicts, bioclip_model, tokenizer, full_hi
     """
 
     species_embeddings = {}
+    if names_to_use is None:
+        names_to_use = [d['scientific_name'] for d in species_name_dicts]
 
     # For each species, get the relevant taxonomic name, process using BioCLIP, and add to the dictionary to return
-    for name_dict in species_name_dicts:
+    for name, name_dict in zip(names_to_use, species_name_dicts):
         name_strs = format_species_name_CLIP(name_dict, full_hierarchy, common_name)
         text = tokenizer(name_strs)
 
@@ -202,9 +207,9 @@ def get_species_embeddings(species_name_dicts, bioclip_model, tokenizer, full_hi
 
             mean_embedding = text_features.mean(axis = 0) # get the mean embedding when there are multiple common names
 
-        species_embeddings[name_dict['scientific_name']] = {}
-        species_embeddings[name_dict['scientific_name']]['embedding'] = mean_embedding.numpy()
-        species_embeddings[name_dict['scientific_name']]['names_used'] = name_strs
+        species_embeddings[name] = {}
+        species_embeddings[name]['embedding'] = mean_embedding.numpy()
+        species_embeddings[name]['names_used'] = name_strs
 
     return species_embeddings
 
@@ -613,17 +618,3 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
     y_train, y_test = train_data[target_col].values, test_data[target_col].values
 
     return X_train, y_train, X_test, y_test
-
-if __name__ == '__main__':
-    data_path = '/Users/emiliolr/Google Drive/My Drive/LIFE/MRes_datasets/hunting_effects/benitez_lopez2019/huntmamdata.csv'
-    ben_lop2019 = read_csv_non_utf(data_path)
-
-    np.random.seed(1693)
-    idxs = np.arange(0, len(ben_lop2019))
-    np.random.shuffle(idxs)
-    train_size = 0.7
-    train_idxs = idxs[ : int(0.7 * len(idxs))]
-    test_idxs = idxs[int(0.7 * len(idxs)) : ]
-
-    pp_data = preprocess_data(ben_lop2019, include_indicators = True, standardize = True,
-                              log_trans_cont = True, train_test_idxs = {'train' : train_idxs, 'test' : test_idxs})
