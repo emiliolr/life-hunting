@@ -13,8 +13,11 @@ import open_clip
 import torch
 from huggingface_hub import hf_hub_download
 
-sys.path.append('satclip')
-sys.path.append('satclip/satclip')
+this_file = '/Users/emiliolr/Desktop/life-hunting/species_embeddings.py'
+dir_to_add = os.path.dirname(os.path.relpath(this_file))
+sys.path.append(os.path.join(dir_to_add, 'satclip'))
+sys.path.append(os.path.join(dir_to_add, 'satclip', 'satclip'))
+
 import satclip
 from satclip.load import get_satclip
 
@@ -129,7 +132,7 @@ def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_t
     # Getting the mean BioCLIP embedding for each record in the dataset
     if 'BioCLIP' in embeddings_to_use:
         #  reading in the saved embeddings
-        with open('embeddings/bioclip_embeddings.json', 'r') as f:
+        with open(os.path.join(dir_to_add, 'embeddings/bioclip_embeddings.json'), 'r') as f:
             bioclip_emb = json.load(f)
 
         #  getting embeddings for the dataset
@@ -208,7 +211,7 @@ def multi_species_extraction(species_names):
 
 def read_dataset():
     # Loading in general configuration
-    with open('config.json', 'r') as f:
+    with open(os.path.join(dir_to_add, 'config.json'), 'r') as f:
         config = json.load(f)
 
     # Getting filepaths
@@ -314,9 +317,8 @@ def main():
         all_embeddings[entry] = higher_tax_embeddings[entry]
 
     #  saving the unified embedding dict
-    with open('embeddings/bioclip_embeddings.json', 'w') as f:
+    with open(os.path.join(dir_to_add, 'embeddings/bioclip_embeddings.json'), 'w') as f:
         json.dump(all_embeddings, f)
 
 if __name__ == '__main__':
-    # main()
-    pass
+    main()

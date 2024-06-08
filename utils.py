@@ -324,7 +324,8 @@ def count_parameters(model):
     return num_params
 
 def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, extirp_pos = True,
-                              zero_columns = None, nonzero_columns = None, indicator_columns = None):
+                              zero_columns = None, nonzero_columns = None, indicator_columns = None,
+                              embeddings_to_use = None):
 
     """
     A helper function to split out the datasets for the binary (zero) and continuous
@@ -349,6 +350,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         a list of columns to extract for fitting the continuous model
     indicator_columns : list
         a list of columns to use as indicator variables or random effects
+    embeddings_to_use : list
+        the name of the embeddings to use (i.e., 'SatCLIP' and/or 'BioCLIP')
 
     Returns
     -------
@@ -369,6 +372,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         nonzero_columns = ['BM', 'DistKm', 'PopDens']
     if zero_columns is None:
         zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'Reserve']
+    if embeddings_to_use is None:
+        embeddings_to_use = []
 
     X_nonzero = pp_data[[]].copy(deep = True)
     X_zero = pp_data[[]].copy(deep = True)
@@ -378,7 +383,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         X_nonzero = pd.concat((X_nonzero, pp_data.filter(like = col)), axis = 1)
     for col in zero_columns:
         X_zero = pd.concat((X_zero, pp_data.filter(like = col)), axis = 1)
-    for col in indicator_columns:
+    for col in indicator_columns + embeddings_to_use:
+        col = col.lower() if col in embeddings_to_use else col
         X_nonzero = pd.concat((X_nonzero, pp_data.filter(like = col)), axis = 1)
         X_zero = pd.concat((X_zero, pp_data.filter(like = col)), axis = 1)
 
@@ -425,7 +431,7 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
     polynomial_features : integer
         the degree of the polynomial expansion to apply to continuous predictors
     embeddings_to_use : list
-        the name of the embeddings to use (i.e., 'SatCLIP' or 'BioCLIP')
+        the name of the embeddings to use (i.e., 'SatCLIP' and/or 'BioCLIP')
     embeddings_args : dictionary
         kwargs to pass to the get_all_embeddings function
     train_test_idxs : list
@@ -439,6 +445,10 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
     """
 
     assert not include_indicators or not include_categorical, 'Cannot include indicators and categorical variables at the same time.'
+
+    # Setting mutable defaults
+    if embeddings_args is None:
+        embeddings_args = {}
 
     # Defining the variables needed
     indicator_columns = ['Country', 'Species', 'Study', 'Family', 'Order', 'Region', 'Diet']
@@ -584,8 +594,8 @@ def get_train_test_split(len_dataset, train_size = 0.7):
     idxs = np.arange(0, len_dataset)
     np.random.shuffle(idxs)
 
-    train_idxs = idxs[ : int(0.7 * len(idxs))]
-    test_idxs = idxs[int(0.7 * len(idxs)) : ]
+    train_idxs = idxs[ : int(train_size * len(idxs))]
+    test_idxs = idxs[int(train_size * len(idxs)) : ]
 
     idxs = {'train' : train_idxs, 'test' : test_idxs}
 
@@ -670,8 +680,9 @@ if __name__ == '__main__':
                               standardize = True, log_trans_cont = False, polynomial_features = 0,
                               embeddings_to_use = ['SatCLIP', 'BioCLIP'], embeddings_args = embeddings_args,
                               train_test_idxs = train_test_idxs)
-    print(pp_data.columns)
+    X_zero, X_nonzero = get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, extirp_pos = False,
+                                                  zero_columns = None, nonzero_columns = None, indicator_columns = [],
+                                                  embeddings_to_use = ['SatCLIP', 'BioCLIP'])
+    print(X_zero.head())
     print()
-    print(pp_data.shape)
-    print()
-    print(pp_data.iloc[train_test_idxs['train']].std(axis = 0))
+    print(X_nonzero.head())
