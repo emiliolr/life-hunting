@@ -28,13 +28,20 @@ import utils
 def get_record_species_embedding(species_list, embedding_dict):
 
     """
-    A helper function to extract the mean embedding for each record.
+    A helper function to extract the mean embedding for each record. This is designed
+    to be applied to a sandas series.
 
     Paramaters
     ----------
+    species_list : list
+        a list of species for the record
+    embedding_dict : dictionary
+        a dictionary with the embeddings for all species and higher level taxa
 
     Returns
     -------
+    mean_embedding : numpy.array
+        the mean embedding for all species represented in this record
     """
 
     all_embeddings = np.array([embedding_dict[s]['embedding'] for s in species_list])
@@ -49,6 +56,18 @@ def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_t
 
     Paramaters
     ----------
+    ben_lop_data : pandas.DataFrame
+        the Benitez-Lopez et al. (2019) dataset
+    pca : boolean
+        should we apply PCA to reduce the dimensionality of embeddings?
+    var_cutoff : float
+        the cutoff for variance explained in the PCA (dictates the number of
+        components to keep)
+    embeddings_to_use : list
+        a list of embeddings to use (i.e., 'SatCLIP' and/or 'BioCLIP')
+    train_test_idxs : dictionary
+        a dictionary containing entries 'train' and 'test', with lists of indices
+        for each
 
     Returns
     -------
