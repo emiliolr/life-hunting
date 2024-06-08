@@ -1,3 +1,5 @@
+import sys
+import os
 from io import StringIO
 
 import pandas as pd
@@ -9,6 +11,7 @@ from pytaxize import Ids, itis
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 
 from custom_metrics import true_skill_statistic
+import species_embeddings
 
 def read_csv_non_utf(filepath, **kwargs):
 
@@ -39,6 +42,21 @@ def read_csv_non_utf(filepath, **kwargs):
     dataset = pd.read_csv(StringIO(data), **kwargs)
 
     return dataset
+
+# Helper class from StackOverflow: https://stackoverflow.com/questions/8391411/how-to-block-calls-to-print
+class HiddenPrints:
+
+    """
+    Helper class to suppress printing using `with`.
+    """
+
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
 
 def get_species_names(scientific_name = None, itis_id = None, level = 'Species'):
 
@@ -387,7 +405,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
 
 def preprocess_data(ben_lop_data, include_indicators = False, include_categorical = False,
                     standardize = False, log_trans_cont = False, polynomial_features = 0,
-                    train_test_idxs = None):
+                    embeddings_to_use = None, embeddings_args = None, train_test_idxs = None):
 
     """
     A helper function to preprocess the hunting effects dataset, including predictors.
@@ -406,6 +424,10 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
         should we log10 transform the continuous predictors?
     polynomial_features : integer
         the degree of the polynomial expansion to apply to continuous predictors
+    embeddings_to_use : list
+        the name of the embeddings to use (i.e., 'SatCLIP' or 'BioCLIP')
+    embeddings_args : dictionary
+        kwargs to pass to the get_all_embeddings function
     train_test_idxs : list
         a dictionary of training/testing indices to ensure preprocessing only uses
         information (e.g., statistics) from training data
@@ -472,6 +494,12 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
         pp_data = pd.get_dummies(pp_data, dtype = float, drop_first = True, columns = indicator_columns)
     elif include_categorical:
         pp_data = pd.concat((pp_data, ben_lop_data[indicator_columns].copy(deep = True)), axis = 1)
+
+    # Optionally adding DL embeddings as predictors
+    if embeddings_to_use is not None:
+        all_embeddings = species_embeddings.get_all_embeddings(ben_lop_data, embeddings_to_use = embeddings_to_use,
+                                                              train_test_idxs = train_test_idxs, **embeddings_args)
+        pp_data = pd.concat((pp_data, all_embeddings), axis = 1) # this should be fine since both DFs are sorted by index
 
     # Add back in the response variable
     pp_data[response_column] = ben_lop_data[response_column]
@@ -617,3 +645,33 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
     y_train, y_test = train_data[target_col].values, test_data[target_col].values
 
     return X_train, y_train, X_test, y_test
+
+if __name__ == '__main__':
+    import json
+
+    # Loading in general configuration
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+
+    # Getting filepaths
+    gdrive_fp = config['gdrive_path']
+    LIFE_fp = config['LIFE_folder']
+    dataset_fp = config['datasets_path']
+
+    # Grabbing Benitez-Lopez
+    benitez_lopez2019 = config['indiv_data_paths']['benitez_lopez2019']
+    ben_lop_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019)
+    ben_lop2019 = read_csv_non_utf(ben_lop_path)
+
+    train_test_idxs = get_train_test_split(len(ben_lop2019))
+    embeddings_args = {'pca' : True,
+                       'var_cutoff' : 0.9}
+    pp_data = preprocess_data(ben_lop2019, include_indicators = False, include_categorical = False,
+                              standardize = True, log_trans_cont = False, polynomial_features = 0,
+                              embeddings_to_use = ['SatCLIP', 'BioCLIP'], embeddings_args = embeddings_args,
+                              train_test_idxs = train_test_idxs)
+    print(pp_data.columns)
+    print()
+    print(pp_data.shape)
+    print()
+    print(pp_data.iloc[train_test_idxs['train']].std(axis = 0))

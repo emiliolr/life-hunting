@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import copy
 from itertools import chain
@@ -9,11 +10,144 @@ import pandas as pd
 import numpy as np
 
 import open_clip
+import torch
 from huggingface_hub import hf_hub_download
+
+sys.path.append('satclip')
+sys.path.append('satclip/satclip')
+import satclip
+from satclip.load import get_satclip
+
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 from pytaxize import gn, Ids, itis
 
-from utils import read_csv_non_utf, get_species_embeddings, get_species_names
+import utils
+
+def get_record_species_embedding(species_list, embedding_dict):
+
+    """
+    A helper function to extract the mean embedding for each record.
+
+    Paramaters
+    ----------
+
+    Returns
+    -------
+    """
+
+    all_embeddings = np.array([embedding_dict[s]['embedding'] for s in species_list])
+    mean_embedding = np.mean(all_embeddings, axis = 0)
+
+    return mean_embedding
+
+def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_to_use = None, train_test_idxs = None):
+
+    """
+    A function to get the requested deep learning embeddings for the dataset.
+
+    Paramaters
+    ----------
+
+    Returns
+    -------
+    """
+
+    if pca:
+        assert train_test_idxs is not None, 'If performing PCA, please provide training and testing indices.'
+
+    if embeddings_to_use is None:
+        embeddings_to_use = ['SatCLIP', 'BioCLIP']
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    embeddings = []
+
+    # Getting the SatCLIP location embedding
+    if 'SatCLIP' in embeddings_to_use:
+        #  this only loads location encoder by default
+        with utils.HiddenPrints():
+            model = get_satclip(hf_hub_download('microsoft/SatCLIP-ResNet50-L40', 'satclip-resnet50-l40.ckpt'),
+                                device = device)
+        model.eval()
+
+        #  extracting coordinates - inputs are (longitude, latitude)
+        coords = torch.from_numpy(ben_lop_data[['X', 'Y']].values).to(device)
+
+        #  processing using the pre-trained location embedder from SatCLIP
+        with torch.no_grad():
+            coord_emb = model(coords).detach().cpu()
+            coord_emb /= coord_emb.norm(dim = -1, keepdim = True) # vector norm to be consistent w/BioCLIP
+
+        coord_emb = coord_emb.numpy()
+
+        #  optionally applying PCA to reduce dimensionality of the embedding
+        if pca:
+            #  scaling the data (z-score normalization)
+            scaler = StandardScaler()
+            coord_emb_train = scaler.fit_transform(coord_emb[train_test_idxs['train']])
+            coord_emb_test = scaler.transform(coord_emb[train_test_idxs['test']])
+
+            #  performing PCA
+            pca = PCA()
+            coord_pca_train = pca.fit_transform(coord_emb_train)
+            coord_pca_test = pca.transform(coord_emb_test)
+
+            #  getting enough components to explain > var_cutoff variance
+            exp_var = pca.explained_variance_ratio_.cumsum()
+            idx_cutoff = np.argmax(exp_var > var_cutoff) + 1
+            coord_emb = np.vstack((coord_pca_train[ : , : idx_cutoff], coord_pca_test[ : , : idx_cutoff]))
+
+        #  putting into a dataframe
+        cols = [f'satclip_{i}' for i in range(coord_emb.shape[1])]
+        coord_emb_pd = pd.DataFrame(coord_emb, columns = cols)
+        if pca:
+            coord_emb_pd.index = list(train_test_idxs['train']) + list(train_test_idxs['test'])
+            coord_emb_pd = coord_emb_pd.sort_index()
+
+        embeddings.append(coord_emb_pd)
+
+    # Getting the mean BioCLIP embedding for each record in the dataset
+    if 'BioCLIP' in embeddings_to_use:
+        #  reading in the saved embeddings
+        with open('embeddings/bioclip_embeddings.json', 'r') as f:
+            bioclip_emb = json.load(f)
+
+        #  getting embeddings for the dataset
+        species = ben_lop_data['Species'].apply(multi_species_extraction)
+        species_emb = species.apply(get_record_species_embedding, args = (bioclip_emb, )).values
+        species_emb = np.stack(species_emb)
+
+        #  optionally applying PCA to reduce dimensionality of the embedding
+        if pca:
+            #  scaling the data (z-score normalization)
+            scaler = StandardScaler()
+            species_emb_train = scaler.fit_transform(species_emb[train_test_idxs['train']])
+            species_emb_test = scaler.transform(species_emb[train_test_idxs['test']])
+
+            #  performing PCA
+            pca = PCA()
+            species_pca_train = pca.fit_transform(species_emb_train)
+            species_pca_test = pca.transform(species_emb_test)
+
+            #  getting enough components to explain > var_cutoff variance
+            exp_var = pca.explained_variance_ratio_.cumsum()
+            idx_cutoff = np.argmax(exp_var > var_cutoff) + 1
+            species_emb = np.vstack((species_pca_train[ : , : idx_cutoff], species_pca_test[ : , : idx_cutoff]))
+
+        #  putting into a dataframe
+        cols = [f'bioclip_{i}' for i in range(species_emb.shape[1])]
+        species_emb_pd = pd.DataFrame(species_emb, columns = cols)
+        if pca:
+            species_emb_pd.index = list(train_test_idxs['train']) + list(train_test_idxs['test'])
+            species_emb_pd = species_emb_pd.sort_index()
+
+        embeddings.append(species_emb_pd)
+
+    # Combining embeddings into a unified dataframe
+    all_emb = pd.concat(embeddings, axis = 1)
+
+    return all_emb
 
 def multi_species_extraction(species_names):
     if ', ' in species_names:
@@ -66,7 +200,7 @@ def read_dataset():
     # Grabbing Benitez-Lopez
     benitez_lopez2019 = config['indiv_data_paths']['benitez_lopez2019']
     ben_lop_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019)
-    ben_lop2019 = read_csv_non_utf(ben_lop_path)
+    ben_lop2019 = utils.read_csv_non_utf(ben_lop_path)
 
     return ben_lop2019
 
@@ -98,7 +232,7 @@ def get_higher_level_dicts(higher_tax_level):
         level_to_pass = level.replace('Sub', '')
 
         #  cleaning up the output to reflect the fact that we only have genus info
-        tax_names = get_species_names(itis_id = sel_id, level = level_to_pass)
+        tax_names = utils.get_species_names(itis_id = sel_id, level = level_to_pass)
         higher_tax_full.append(tax_names)
 
     return higher_tax_full
@@ -120,7 +254,7 @@ def get_species_dicts(full_species, species_resolved):
     # Querying ITIS for full taxonomic hierachy using our existing function
     full_names = []
     for species, itis_id in tqdm(species_itis.items()):
-        full_names.append(get_species_names(species, itis_id))
+        full_names.append(utils.get_species_names(species, itis_id))
 
     return full_names
 
@@ -150,10 +284,10 @@ def main():
 
     # Processing w/BioCLIP and saving the resulting embeddings
     print(f'Getting BioCLIP embeddings for {len(higher_tax_full) + len(species_full)} records')
-    species_embeddings = get_species_embeddings(species_full, model, tokenizer, full_hierarchy = True,
-                                                common_name = True)
-    higher_tax_embeddings = get_species_embeddings(higher_tax_full, model, tokenizer, full_hierarchy = True,
-                                                   common_name = True, names_to_use = higher_tax_level)
+    species_embeddings = utils.get_species_embeddings(species_full, model, tokenizer, full_hierarchy = True,
+                                                      common_name = True)
+    higher_tax_embeddings = utils.get_species_embeddings(higher_tax_full, model, tokenizer, full_hierarchy = True,
+                                                         common_name = True, names_to_use = higher_tax_level)
 
     #  merging the embedding dicts
     all_embeddings = copy.deepcopy(species_embeddings)
@@ -165,4 +299,5 @@ def main():
         json.dump(all_embeddings, f)
 
 if __name__ == '__main__':
-    main()
+    # main()
+    pass
