@@ -11,7 +11,7 @@ from pytaxize import Ids, itis
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 
 from custom_metrics import true_skill_statistic
-import species_embeddings
+import embeddings
 
 def read_csv_non_utf(filepath, **kwargs):
 

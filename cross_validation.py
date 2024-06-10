@@ -117,6 +117,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
 
     # Running the k-fold cross-validation
     coords = data[['X', 'Y']].values
+    all_preds = {'index' : [], 'fold' : [], 'actual' : [], 'predicted' : []}
     for i, (train_idx, test_idx) in enumerate(kfold.split(coords, groups = groups)):
         if verbose:
             print(f'Fold {i}:')
@@ -168,7 +169,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
                                                                  train_test_idxs = train_test_idxs)
 
             #  training the model + perform model search
-            model.fit(X_train = X_train, y_train = y_train, **fit_args)
+            model.fit(X_train, y_train, **fit_args)
 
             #  predicting on the test set
             y_pred = model.predict(X_test)
@@ -186,6 +187,12 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
         elif len(class_metrics) != 0:
             true_DI_cats = ratios_to_DI_cats(y_test)
             pred_DI_cats = ratios_to_DI_cats(y_pred)
+
+        # Save predictions and true values for this test set
+        all_preds['index'].extend(train_test_idxs['test'])
+        all_preds['fold'].extend([i for k in range(len(y_test))])
+        all_preds['actual'].extend(y_test)
+        all_preds['predicted'].extend(y_pred)
 
         # Get regression test metrics for this train/test split
         for metric in reg_metrics.keys():
@@ -206,6 +213,11 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
         for metric in class_metrics['overall'].keys():
             kws = class_metrics['overall'][metric]['kwargs']
             metric_dict[metric].append(class_metrics['overall'][metric]['function'](true_DI_cats, pred_DI_cats, **kws))
+
+    # Formatting prediction saves and adding to the metric dictionary
+    all_preds = pd.DataFrame(all_preds)
+    all_preds = all_preds.set_index('index')
+    metric_dict['raw_preds'] = all_preds
 
     return metric_dict
 
@@ -352,11 +364,25 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
     final_results['group_col'] = cross_val_params['group_col'] if cross_val_params['block_type'] == 'group' else np.nan
 
     # Saving to the inputted file
-    if os.path.isfile(save_fp):
-        existing_results = pd.read_csv(save_fp)
+    save_filename = os.path.join(save_fp, 'cross_val_results.csv')
+    if os.path.isfile(save_filename):
+        existing_results = pd.read_csv(save_filename)
         all_results = pd.concat((existing_results, final_results))
-        all_results.to_csv(save_fp, index = False)
+        all_results.to_csv(save_filename, index = False)
     else:
-        final_results.to_csv(save_fp, index = False)
+        final_results.to_csv(save_filename, index = False)
+
+    # Saving the raw predictions
+    raw_preds = metrics_dict['raw_preds']
+
+    save_filename = f'{model_name}_{cross_val_params["num_folds"]}-fold_{final_results["block_type"].iloc[0]}-blocking'
+    if cross_val_params['block_type'] == 'spatial':
+        save_filename += f'_{cross_val_params["spatial_spacing"]}-degree'
+    elif cross_val_params['block_type'] == 'group':
+        save_filename += f'_{cross_val_params["group_col"].lower()}'
+    save_filename += '.csv'
+
+    preds_fp = os.path.join(save_fp, 'raw_predictions', save_filename)
+    raw_preds.to_csv(preds_fp)
 
     return final_results
