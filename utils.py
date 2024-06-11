@@ -507,7 +507,7 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
 
     # Optionally adding DL embeddings as predictors
     if embeddings_to_use is not None:
-        all_embeddings = species_embeddings.get_all_embeddings(ben_lop_data, embeddings_to_use = embeddings_to_use,
+        all_embeddings = embeddings.get_all_embeddings(ben_lop_data, embeddings_to_use = embeddings_to_use,
                                                               train_test_idxs = train_test_idxs, **embeddings_args)
         pp_data = pd.concat((pp_data, all_embeddings), axis = 1) # this should be fine since both DFs are sorted by index
 

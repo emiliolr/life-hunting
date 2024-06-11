@@ -279,7 +279,8 @@ def format_cv_results(metric_dict_sub, class_metrics, reg_metrics, result_type =
 
     return results
 
-def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_metrics = None, reg_metrics = None):
+def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_metrics = None,
+                    reg_metrics = None, vals_to_save = None):
 
     """
     A helper function to wrap the re-formatting and aggregation of the results dictionary
@@ -292,7 +293,7 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
     model_name : string
         the name of the model used
     save_fp : string
-        a filepath for saving the formatted results as a CSV
+        a folder for saving the metric results and the raw predictions
     cross_val_params : dictionary
         the parameters used for cross-validation, should have entries for 'num_folds,'
         'block_type,' 'spatial_spacing,' and 'group_col'
@@ -300,6 +301,8 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
         the classification metrics used (see 'run_cross_val' above)
     reg_metrics : dictionary
         the regression metrics used (see 'run_cross_val' above)
+    vals_to_save : list
+        a list of the values to save, can include 'metrics' and 'raw'
 
     Returns
     -------
@@ -309,13 +312,15 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
     """
 
     # Setting mutable defaults
-    assert (class_metrics is not None) or (reg_metrics is not None), 'Make sure one of "class_metrics" or "reg_metrics" is non-empty.'
+    assert (class_metrics is not None) or (reg_metrics is not None), 'Make sure one of "class_metrics" or "reg_metrics" is not None.'
     assert len(metrics_dict) > 0, 'The inputted "metrics_dict" has no entries.'
 
     if class_metrics is None:
         class_metrics = {'per_class' : {}, 'overall' : {}}
     if reg_metrics is None:
         reg_metrics = {}
+    if vals_to_save is None:
+        vals_to_save = ['metrics', 'raw']
 
     # Cleaning per-class classification metrics
     per_class_dict = {m : metrics_dict[m] for m in class_metrics['per_class']}
@@ -364,25 +369,27 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
     final_results['group_col'] = cross_val_params['group_col'] if cross_val_params['block_type'] == 'group' else np.nan
 
     # Saving to the inputted file
-    save_filename = os.path.join(save_fp, 'cross_val_results.csv')
-    if os.path.isfile(save_filename):
-        existing_results = pd.read_csv(save_filename)
-        all_results = pd.concat((existing_results, final_results))
-        all_results.to_csv(save_filename, index = False)
-    else:
-        final_results.to_csv(save_filename, index = False)
+    if 'metrics' in vals_to_save:
+        save_filename = os.path.join(save_fp, 'cross_val_results.csv')
+        if os.path.isfile(save_filename):
+            existing_results = pd.read_csv(save_filename)
+            all_results = pd.concat((existing_results, final_results))
+            all_results.to_csv(save_filename, index = False)
+        else:
+            final_results.to_csv(save_filename, index = False)
 
     # Saving the raw predictions
-    raw_preds = metrics_dict['raw_preds']
+    if 'raw' in vals_to_save:
+        raw_preds = metrics_dict['raw_preds']
 
-    save_filename = f'{model_name}_{cross_val_params["num_folds"]}-fold_{final_results["block_type"].iloc[0]}-blocking'
-    if cross_val_params['block_type'] == 'spatial':
-        save_filename += f'_{cross_val_params["spatial_spacing"]}-degree'
-    elif cross_val_params['block_type'] == 'group':
-        save_filename += f'_{cross_val_params["group_col"].lower()}'
-    save_filename += '.csv'
+        save_filename = f'{model_name}_{cross_val_params["num_folds"]}-fold_{final_results["block_type"].iloc[0]}-blocking'
+        if cross_val_params['block_type'] == 'spatial':
+            save_filename += f'_{cross_val_params["spatial_spacing"]}-degree'
+        elif cross_val_params['block_type'] == 'group':
+            save_filename += f'_{cross_val_params["group_col"].lower()}'
+        save_filename += '.csv'
 
-    preds_fp = os.path.join(save_fp, 'raw_predictions', save_filename)
-    raw_preds.to_csv(preds_fp)
+        preds_fp = os.path.join(save_fp, 'raw_predictions', save_filename)
+        raw_preds.to_csv(preds_fp)
 
     return final_results
