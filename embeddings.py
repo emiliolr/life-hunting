@@ -89,7 +89,8 @@ def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_t
     if 'SatCLIP' in embeddings_to_use:
         #  this only loads location encoder by default
         with utils.HiddenPrints():
-            model = get_satclip(hf_hub_download('microsoft/SatCLIP-ResNet50-L40', 'satclip-resnet50-l40.ckpt'),
+            model = get_satclip(hf_hub_download('microsoft/SatCLIP-ResNet50-L40',
+                                                'satclip-resnet50-l40.ckpt'), # using the higher-resolution model by default...
                                 device = device)
         model.eval()
 

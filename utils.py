@@ -325,7 +325,7 @@ def count_parameters(model):
 
 def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, extirp_pos = True,
                               zero_columns = None, nonzero_columns = None, indicator_columns = None,
-                              embeddings_to_use = None):
+                              embeddings_to_use = None, dataset = 'mammals'):
 
     """
     A helper function to split out the datasets for the binary (zero) and continuous
@@ -363,15 +363,33 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         an array containing the binary labels for the zero model
     y_nonzero : numpy.array
         an array containing the continuous response ratios for the zero model
+    dataset : string
+        the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019) or
+        'birds' (Ferreiro-Arias et al., 2024)
     """
 
-    # Grabbing needed predictors for each model
-    if indicator_columns is None:
-        indicator_columns = ['Country', 'Species', 'Study', 'Family']
-    if nonzero_columns is None:
-        nonzero_columns = ['BM', 'DistKm', 'PopDens']
-    if zero_columns is None:
-        zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'Reserve']
+    # Default predictors
+    if dataset == 'mammals':
+        if indicator_columns is None:
+            indicator_columns = ['Country', 'Species', 'Study', 'Family']
+        if nonzero_columns is None:
+            nonzero_columns = ['BM', 'DistKm', 'PopDens']
+        if zero_columns is None:
+            zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'Reserve']
+    elif dataset == 'birds':
+        if indicator_columns is None:
+            indicator_columns = ['Country', 'Species']
+        if nonzero_columns is None:
+            nonzero_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting',
+                               'FoodBiomass', 'Forest_cover', 'NPP', 'Body_Mass',
+                               'Reserve']
+        if zero_columns is None:
+            zero_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting',
+                            'FoodBiomass', 'Forest_cover', 'NPP', 'Body_Mass',
+                            'Reserve']
+    else:
+        raise ValueError('The only supported datasets are "mammals" and "birds".')
+
     if embeddings_to_use is None:
         embeddings_to_use = []
 
@@ -394,7 +412,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
 
     # Extracting the inputs/outputs for each of the models in the case where we have labels
     if not pred:
-        ratio = pp_data['ratio'].values
+        resp_col = 'ratio' if dataset == 'mammals' else 'RR'
+        ratio = pp_data[resp_col].values
         nonzero_mask = (ratio != 0)
         outlier_mask = ratio < outlier_cutoff # only keeping values smaller than cutoff - ratio is always positive!
 
@@ -409,16 +428,17 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
 
     return X_zero, X_nonzero
 
-def preprocess_data(ben_lop_data, include_indicators = False, include_categorical = False,
+def preprocess_data(data, include_indicators = False, include_categorical = False,
                     standardize = False, log_trans_cont = False, polynomial_features = 0,
-                    embeddings_to_use = None, embeddings_args = None, train_test_idxs = None):
+                    embeddings_to_use = None, embeddings_args = None, train_test_idxs = None,
+                    dataset = 'mammals'):
 
     """
     A helper function to preprocess the hunting effects dataset, including predictors.
 
     Paramaters
     ----------
-    ben_lop_data : pandas.DataFrame
+    data : pandas.DataFrame
         a dataframe containing the hunting effects dataset (predictors and response)
     include_indicators : boolean
         should we create indicator columns for categorical predictors?
@@ -437,6 +457,9 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
     train_test_idxs : list
         a dictionary of training/testing indices to ensure preprocessing only uses
         information (e.g., statistics) from training data
+    dataset : string
+        the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019) or
+        'birds' (Ferreiro-Arias et al., 2024)
 
     Returns
     -------
@@ -451,13 +474,25 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
         embeddings_args = {}
 
     # Defining the variables needed
-    indicator_columns = ['Country', 'Species', 'Study', 'Family', 'Order', 'Region', 'Diet']
-    continuous_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime', 'LivestockBio', 'Literacy']
-    special_columns = ['Reserve']
-    response_column = 'ratio'
+    if dataset == 'mammals':
+        indicator_columns = ['Country', 'Species', 'Study', 'Family', 'Order',
+                             'Region', 'Diet']
+        continuous_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime',
+                              'LivestockBio', 'Literacy']
+        special_columns = ['Reserve']
+        response_column = 'ratio'
+    elif dataset == 'birds':
+        indicator_columns = ['Study', 'Dataset', 'Order', 'Family', 'Species',
+                             'Traded', 'Realm', 'Country', 'Food', 'Hunted']
+        continuous_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting',
+                              'FoodBiomass', 'Forest_cover', 'NPP', 'Body_Mass']
+        special_columns = ['Reserve']
+        response_column = 'RR'
+    else:
+        raise ValueError('The only supported datasets are "mammals" and "birds".')
 
     # Grabbing just the fixed-effects predictors
-    pp_data = ben_lop_data[continuous_columns + special_columns].copy(deep = True)
+    pp_data = data[continuous_columns + special_columns].copy(deep = True)
 
     # Turning reserve into an indicator variable
     pp_data['Reserve'] = (pp_data['Reserve'] == 'Yes').astype(int)
@@ -500,19 +535,19 @@ def preprocess_data(ben_lop_data, include_indicators = False, include_categorica
 
     # Optionally adding indicator (or straight categorical) variables for different groups present in data
     if include_indicators:
-        pp_data = pd.concat((pp_data, ben_lop_data[indicator_columns].copy(deep = True)), axis = 1)
+        pp_data = pd.concat((pp_data, data[indicator_columns].copy(deep = True)), axis = 1)
         pp_data = pd.get_dummies(pp_data, dtype = float, drop_first = True, columns = indicator_columns)
     elif include_categorical:
-        pp_data = pd.concat((pp_data, ben_lop_data[indicator_columns].copy(deep = True)), axis = 1)
+        pp_data = pd.concat((pp_data, data[indicator_columns].copy(deep = True)), axis = 1)
 
     # Optionally adding DL embeddings as predictors
     if embeddings_to_use is not None:
-        all_embeddings = embeddings.get_all_embeddings(ben_lop_data, embeddings_to_use = embeddings_to_use,
-                                                              train_test_idxs = train_test_idxs, **embeddings_args)
+        all_embeddings = embeddings.get_all_embeddings(data, embeddings_to_use = embeddings_to_use,
+                                                       train_test_idxs = train_test_idxs, **embeddings_args)
         pp_data = pd.concat((pp_data, all_embeddings), axis = 1) # this should be fine since both DFs are sorted by index
 
     # Add back in the response variable
-    pp_data[response_column] = ben_lop_data[response_column]
+    pp_data[response_column] = data[response_column]
 
     return pp_data
 
@@ -668,21 +703,25 @@ if __name__ == '__main__':
     LIFE_fp = config['LIFE_folder']
     dataset_fp = config['datasets_path']
 
-    # Grabbing Benitez-Lopez
-    benitez_lopez2019 = config['indiv_data_paths']['benitez_lopez2019']
-    ben_lop_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019)
-    ben_lop2019 = read_csv_non_utf(ben_lop_path)
+    # Grabbing bird dataset
+    ferreiro_arias2024 = config['indiv_data_paths']['ferreiro_arias2024']
+    fer_ari_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024)
+    fer_ari2024 = pd.read_csv(fer_ari_path)
 
-    train_test_idxs = get_train_test_split(len(ben_lop2019))
-    embeddings_args = {'pca' : True,
-                       'var_cutoff' : 0.9}
-    pp_data = preprocess_data(ben_lop2019, include_indicators = False, include_categorical = False,
+    train_test_idxs = get_train_test_split(len(fer_ari2024))
+    pp_data = preprocess_data(fer_ari2024, include_indicators = False, include_categorical = True,
                               standardize = True, log_trans_cont = False, polynomial_features = 0,
-                              embeddings_to_use = ['SatCLIP', 'BioCLIP'], embeddings_args = embeddings_args,
-                              train_test_idxs = train_test_idxs)
-    X_zero, X_nonzero = get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, extirp_pos = False,
-                                                  zero_columns = None, nonzero_columns = None, indicator_columns = [],
-                                                  embeddings_to_use = ['SatCLIP', 'BioCLIP'])
+                              embeddings_to_use = None, embeddings_args = None,
+                              train_test_idxs = None, dataset = 'birds')
+
+    X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, outlier_cutoff = np.Inf, extirp_pos = False,
+                                                                     zero_columns = None, nonzero_columns = None, indicator_columns = None,
+                                                                     embeddings_to_use = None, dataset = 'birds')
+
     print(X_zero.head())
     print()
-    print(X_nonzero.head())
+    print(X_zero.columns)
+    print()
+    print(y_zero)
+    print()
+    print(y_zero.shape)

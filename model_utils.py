@@ -119,7 +119,8 @@ class TwoStageNovelModel(RegressorMixin, BaseEstimator):
     def predict_proba(self):
         pass
 
-def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metrics = None, verbose = True):
+def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metrics = None,
+                     verbose = True, dataset = 'mammals'):
 
     """
     A standard random-split k-fold cross validation function that is compatible with
@@ -142,6 +143,9 @@ def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metri
         the regression metrics to record
     verbose : boolean
         should we print incremental updates during function execution?
+    dataset : string
+        the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019) or
+        'birds' (Ferreiro-Arias et al., 2024)
 
     Returns
     -------
@@ -183,7 +187,8 @@ def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metri
         # Turn predictions into DI categories
         if verbose:
             print('  getting test metrics')
-        test_ratios = data['ratio'].iloc[test_idx].copy(deep = True)
+        resp_col = 'ratio' if dataset == 'mammals' else 'RR'
+        test_ratios = data[resp_col].iloc[test_idx].copy(deep = True)
         pred_ratios = y_pred.copy()
         pred_ratios[pred_ratios != 0] = np.exp(pred_ratios[pred_ratios != 0]) # don't need to back-transform predicted extirpations - not RRs!
 
