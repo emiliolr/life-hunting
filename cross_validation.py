@@ -116,7 +116,9 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
         metric_dict[m] = []
 
     # Running the k-fold cross-validation
-    coords = data[['X', 'Y']].values
+    lat, lon = ('Y', 'X') if pp_args['dataset'] == 'mammals' else ('Latitude', 'Longitude')
+    coords = data[[lon, lat]].values
+
     all_preds = {'index' : [], 'fold' : [], 'actual' : [], 'predicted' : []}
     for i, (train_idx, test_idx) in enumerate(kfold.split(coords, groups = groups)):
         if verbose:
@@ -156,7 +158,9 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
 
             #  predicting on the test set
             y_pred = model.predict(test_data)
-            y_test = test_data['ratio'].copy(deep = True)
+
+            resp_col = 'ratio' if pp_args['dataset'] == 'mammals' else 'RR'
+            y_test = test_data[resp_col].copy(deep = True)
 
             #  back-transforming to go from RRs --> ratios
             if back_transform:
@@ -166,7 +170,8 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
 
             #  getting the data split
             X_train, y_train, X_test, y_test = direct_train_test(pp_data, task = direct, already_pp = True,
-                                                                 train_test_idxs = train_test_idxs)
+                                                                 train_test_idxs = train_test_idxs,
+                                                                 dataset = pp_args['dataset'])
 
             #  training the model + perform model search
             model.fit(X_train, y_train, **fit_args)
@@ -280,7 +285,7 @@ def format_cv_results(metric_dict_sub, class_metrics, reg_metrics, result_type =
     return results
 
 def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_metrics = None,
-                    reg_metrics = None, vals_to_save = None):
+                    reg_metrics = None, vals_to_save = None, dataset = 'mammals'):
 
     """
     A helper function to wrap the re-formatting and aggregation of the results dictionary
@@ -303,6 +308,9 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
         the regression metrics used (see 'run_cross_val' above)
     vals_to_save : list
         a list of the values to save, can include 'metrics' and 'raw'
+    dataset : string
+        the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019) or
+        'birds' (Ferreiro-Arias et al., 2024)
 
     Returns
     -------
@@ -361,6 +369,7 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
     final_results['DI_category'] = final_results['DI_category'].fillna('overall')
     final_results['date'] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
     final_results['model_name'] = model_name
+    final_results['dataset'] = dataset
 
     #  adding info about the cross-val setup
     final_results['num_folds'] = cross_val_params['num_folds']
@@ -382,7 +391,7 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
     if 'raw' in vals_to_save:
         raw_preds = metrics_dict['raw_preds']
 
-        save_filename = f'{model_name}_{cross_val_params["num_folds"]}-fold_{final_results["block_type"].iloc[0]}-blocking'
+        save_filename = f'{model_name}_{dataset}_{cross_val_params["num_folds"]}-fold_{final_results["block_type"].iloc[0]}-blocking'
         if cross_val_params['block_type'] == 'spatial':
             save_filename += f'_{cross_val_params["spatial_spacing"]}-degree'
         elif cross_val_params['block_type'] == 'group':

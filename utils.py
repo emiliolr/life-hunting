@@ -352,6 +352,9 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         a list of columns to use as indicator variables or random effects
     embeddings_to_use : list
         the name of the embeddings to use (i.e., 'SatCLIP' and/or 'BioCLIP')
+    dataset : string
+        the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019) or
+        'birds' (Ferreiro-Arias et al., 2024)
 
     Returns
     -------
@@ -363,9 +366,6 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         an array containing the binary labels for the zero model
     y_nonzero : numpy.array
         an array containing the continuous response ratios for the zero model
-    dataset : string
-        the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019) or
-        'birds' (Ferreiro-Arias et al., 2024)
     """
 
     # Default predictors
@@ -494,8 +494,9 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
     # Grabbing just the fixed-effects predictors
     pp_data = data[continuous_columns + special_columns].copy(deep = True)
 
-    # Turning reserve into an indicator variable
-    pp_data['Reserve'] = (pp_data['Reserve'] == 'Yes').astype(int)
+    # Turning reserve into an indicator variable - not needed for bird dataset!
+    if dataset == 'mammals':
+        pp_data['Reserve'] = (pp_data['Reserve'] == 'Yes').astype(int)
 
     # Optionally adding a polynomial basis expansion
     if polynomial_features > 1:
@@ -637,7 +638,7 @@ def get_train_test_split(len_dataset, train_size = 0.7):
     return idxs
 
 def direct_train_test(data, train_size = 0.7, task = 'classification', already_pp = False,
-                      train_test_idxs = None):
+                      train_test_idxs = None, dataset = 'mammals'):
 
     """
     A helper function to get train/test data for direct regression or classification.
@@ -654,6 +655,9 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
         is the data already preprocessed?
     train_test_idxs : dictionary
         the training and testing indices, if already computed
+    dataset : string
+        the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019) or
+        'birds' (Ferreiro-Arias et al., 2024)
 
     Returns
     -------
@@ -674,19 +678,20 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
     # Pre-processing data, if not already preprocessed
     if not already_pp:
         pp_data = preprocess_data(data, include_indicators = False, standardize = True, log_trans_cont = False,
-                                  polynomial_features = 0, train_test_idxs = train_test_idxs)
+                                  polynomial_features = 0, train_test_idxs = train_test_idxs, dataset = dataset)
     else:
         pp_data = data.copy(deep = True)
 
-    pp_data['DI_cat'] = ratios_to_DI_cats(pp_data['ratio'])
+    resp_col = 'ratio' if dataset == 'mammals' else 'RR'
+    pp_data['DI_cat'] = ratios_to_DI_cats(pp_data[resp_col])
 
     # Splitting the dataset into train/test sets
     train_data, test_data = pp_data.iloc[train_test_idxs['train']], pp_data.iloc[train_test_idxs['test']]
 
     # Putting into the format that FLAML wants
-    target_col = 'ratio' if task == 'regression' else 'DI_cat'
+    target_col = resp_col if task == 'regression' else 'DI_cat'
 
-    X_train, X_test = train_data.drop(columns = ['ratio', 'DI_cat']), test_data.drop(columns = ['ratio', 'DI_cat'])
+    X_train, X_test = train_data.drop(columns = [resp_col, 'DI_cat']), test_data.drop(columns = [resp_col, 'DI_cat'])
     y_train, y_test = train_data[target_col].values, test_data[target_col].values
 
     return X_train, y_train, X_test, y_test
