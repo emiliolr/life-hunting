@@ -708,25 +708,21 @@ if __name__ == '__main__':
     LIFE_fp = config['LIFE_folder']
     dataset_fp = config['datasets_path']
 
-    # Grabbing bird dataset
-    ferreiro_arias2024 = config['indiv_data_paths']['ferreiro_arias2024']
-    fer_ari_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024)
-    fer_ari2024 = pd.read_csv(fer_ari_path)
+    # Grabbing dataset
+    benitez_lopez2019 = config['indiv_data_paths']['benitez_lopez2019']
+    ben_lop_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019)
+    ben_lop2019 = read_csv_non_utf(ben_lop_path)
 
-    train_test_idxs = get_train_test_split(len(fer_ari2024))
-    pp_data = preprocess_data(fer_ari2024, include_indicators = False, include_categorical = True,
+    train_test_idxs = get_train_test_split(len(ben_lop2019))
+    pp_data = preprocess_data(ben_lop2019, include_indicators = False, include_categorical = False,
                               standardize = True, log_trans_cont = False, polynomial_features = 0,
-                              embeddings_to_use = None, embeddings_args = None,
-                              train_test_idxs = None, dataset = 'birds')
+                              embeddings_to_use = ['SatCLIP', 'BioCLIP'], embeddings_args = {'pca' : False},
+                              train_test_idxs = train_test_idxs, dataset = 'mammals')
 
-    X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, outlier_cutoff = np.Inf, extirp_pos = False,
-                                                                     zero_columns = None, nonzero_columns = None, indicator_columns = None,
-                                                                     embeddings_to_use = None, dataset = 'birds')
-
-    print(X_zero.head())
+    print(pp_data.shape)
     print()
-    print(X_zero.columns)
+    print(pp_data.head())
     print()
-    print(y_zero)
+    print(pp_data.columns[~np.isclose(pp_data.iloc[train_test_idxs['train']].mean(axis = 0), 0)])
     print()
-    print(y_zero.shape)
+    print(pp_data.columns[~np.isclose(pp_data.iloc[train_test_idxs['train']].std(axis = 0), 1, atol = 0.001)])

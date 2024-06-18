@@ -52,7 +52,8 @@ def get_record_species_embedding(species_list, embedding_dict):
 
     return mean_embedding
 
-def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_to_use = None, train_test_idxs = None):
+def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_to_use = None,
+                       train_test_idxs = None, satclip_L = 40):
 
     """
     A function to get the requested deep learning embeddings for the dataset.
@@ -74,10 +75,13 @@ def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_t
 
     Returns
     -------
+    all_emb : pandas.DataFrame
+        a dataframe containing embeddings, each row corresponds to a row of the
+        original dataframe (i.e., an observation) and each column is a dimension
+        of the embedding (potentially projected onto the principal components)
     """
 
-    if pca:
-        assert train_test_idxs is not None, 'If performing PCA, please provide training and testing indices.'
+    assert train_test_idxs is not None, 'Please provide training and testing indices to facilitate standardization and PCA.'
 
     if embeddings_to_use is None:
         embeddings_to_use = ['SatCLIP', 'BioCLIP']
@@ -89,8 +93,8 @@ def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_t
     if 'SatCLIP' in embeddings_to_use:
         #  this only loads location encoder by default
         with utils.HiddenPrints():
-            model = get_satclip(hf_hub_download('microsoft/SatCLIP-ResNet50-L40',
-                                                'satclip-resnet50-l40.ckpt'), # using the higher-resolution model by default...
+            model = get_satclip(hf_hub_download(f'microsoft/SatCLIP-ResNet50-L{satclip_L}',
+                                                f'satclip-resnet50-l{satclip_L}.ckpt'), # using the higher-resolution model by default...
                                 device = device)
         model.eval()
 
@@ -104,29 +108,32 @@ def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_t
 
         coord_emb = coord_emb.numpy()
 
+        #  scaling the data (z-score normalization)
+        scaler = StandardScaler()
+        coord_emb_train = scaler.fit_transform(coord_emb[train_test_idxs['train']])
+        coord_emb_test = scaler.transform(coord_emb[train_test_idxs['test']])
+
         #  optionally applying PCA to reduce dimensionality of the embedding
         if pca:
-            #  scaling the data (z-score normalization)
-            scaler = StandardScaler()
-            coord_emb_train = scaler.fit_transform(coord_emb[train_test_idxs['train']])
-            coord_emb_test = scaler.transform(coord_emb[train_test_idxs['test']])
-
-            #  performing PCA
             pca = PCA()
-            coord_pca_train = pca.fit_transform(coord_emb_train)
-            coord_pca_test = pca.transform(coord_emb_test)
+            coord_emb_train = pca.fit_transform(coord_emb_train)
+            coord_emb_test = pca.transform(coord_emb_test)
 
             #  getting enough components to explain > var_cutoff variance
             exp_var = pca.explained_variance_ratio_.cumsum()
             idx_cutoff = np.argmax(exp_var > var_cutoff) + 1
-            coord_emb = np.vstack((coord_pca_train[ : , : idx_cutoff], coord_pca_test[ : , : idx_cutoff]))
+        else:
+            idx_cutoff = coord_emb_train.shape[1] # just including all embeddings
+
+        coord_emb = np.vstack((coord_emb_train[ : , : idx_cutoff], coord_emb_test[ : , : idx_cutoff]))
 
         #  putting into a dataframe
         cols = [f'satclip_{i}' for i in range(coord_emb.shape[1])]
         coord_emb_pd = pd.DataFrame(coord_emb, columns = cols)
-        if pca:
-            coord_emb_pd.index = list(train_test_idxs['train']) + list(train_test_idxs['test'])
-            coord_emb_pd = coord_emb_pd.sort_index()
+
+        #  sorting rows to facilitate combination with the rest of the dataset
+        coord_emb_pd.index = list(train_test_idxs['train']) + list(train_test_idxs['test'])
+        coord_emb_pd = coord_emb_pd.sort_index()
 
         embeddings.append(coord_emb_pd)
 
@@ -141,29 +148,32 @@ def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_t
         species_emb = species.apply(get_record_species_embedding, args = (bioclip_emb, )).values
         species_emb = np.stack(species_emb)
 
+        #  scaling the data (z-score normalization)
+        scaler = StandardScaler()
+        species_emb_train = scaler.fit_transform(species_emb[train_test_idxs['train']])
+        species_emb_test = scaler.transform(species_emb[train_test_idxs['test']])
+
         #  optionally applying PCA to reduce dimensionality of the embedding
         if pca:
-            #  scaling the data (z-score normalization)
-            scaler = StandardScaler()
-            species_emb_train = scaler.fit_transform(species_emb[train_test_idxs['train']])
-            species_emb_test = scaler.transform(species_emb[train_test_idxs['test']])
-
-            #  performing PCA
             pca = PCA()
-            species_pca_train = pca.fit_transform(species_emb_train)
-            species_pca_test = pca.transform(species_emb_test)
+            species_emb_train = pca.fit_transform(species_emb_train)
+            species_emb_test = pca.transform(species_emb_test)
 
             #  getting enough components to explain > var_cutoff variance
             exp_var = pca.explained_variance_ratio_.cumsum()
             idx_cutoff = np.argmax(exp_var > var_cutoff) + 1
-            species_emb = np.vstack((species_pca_train[ : , : idx_cutoff], species_pca_test[ : , : idx_cutoff]))
+        else:
+            idx_cutoff = species_emb_train.shape[1] # just including all embeddings
+
+        species_emb = np.vstack((species_emb_train[ : , : idx_cutoff], species_emb_test[ : , : idx_cutoff]))
 
         #  putting into a dataframe
         cols = [f'bioclip_{i}' for i in range(species_emb.shape[1])]
         species_emb_pd = pd.DataFrame(species_emb, columns = cols)
-        if pca:
-            species_emb_pd.index = list(train_test_idxs['train']) + list(train_test_idxs['test'])
-            species_emb_pd = species_emb_pd.sort_index()
+
+        #  sorting rows to facilitate combination with the rest of the dataset
+        species_emb_pd.index = list(train_test_idxs['train']) + list(train_test_idxs['test'])
+        species_emb_pd = species_emb_pd.sort_index()
 
         embeddings.append(species_emb_pd)
 
