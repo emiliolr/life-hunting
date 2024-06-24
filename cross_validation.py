@@ -122,10 +122,10 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
     #  some logic for data splitting based on the dataset
     if pp_args['dataset'] == 'both':
         mammal_mask = data['Class'] == 'Mammalia'
-        split_mammals = kfold.split(coords[mammal_mask], groups = groups)
+        split_mammals = kfold.split(coords[mammal_mask], groups = groups[mammal_mask] if block_type == 'group' else groups)
 
         bird_mask = data['Class'] == 'Aves'
-        split_birds = kfold.split(coords[bird_mask], groups = groups)
+        split_birds = kfold.split(coords[bird_mask], groups = groups[bird_mask] if block_type == 'group' else groups)
 
         splits = zip(split_mammals, split_birds)
     else:
@@ -143,40 +143,21 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
         #   are sure to get the same splits as the single-dataset case!
         if pp_args['dataset'] == 'both':
             (mammal_train_idx, mammal_test_idx), (bird_train_idx, bird_test_idx) = split
+            bird_train_idx, bird_test_idx = bird_train_idx + mammal_mask.sum(), bird_test_idx + mammal_mask.sum()
 
-            # TODO: I think it would be better practice to preprocess ALL data - that way standardization
-            #  actually is consistent, i.e., z-scores are based on ALL data!
-
-            #  preprocess mammal data points
-            mammal_train_test_idxs = {'train' : mammal_train_idx, 'test' : mammal_test_idx}
-            mammal_data = data[mammal_mask].copy(deep = True)
-            pp_data_mammals = preprocess_data(mammal_data, standardize = True,
-                                              train_test_idxs = mammal_train_test_idxs,
-                                              **pp_args)
-
-            #  preprocess bird data points
-            bird_train_test_idxs = {'train' : bird_train_idx, 'test' : bird_test_idx}
-            bird_data = data[bird_mask].copy(deep = True)
-            pp_data_birds = preprocess_data(bird_data, standardize = True,
-                                            train_test_idxs = bird_train_test_idxs,
-                                            **pp_args)
+            train_test_idxs = {'train' : list(mammal_train_idx) + list(bird_train_idx),
+                               'test' : list(mammal_test_idx) + list(bird_test_idx)}
         else:
             train_idx, test_idx = split
             train_test_idxs = {'train' : train_idx, 'test' : test_idx}
-            pp_data = preprocess_data(data, standardize = True, train_test_idxs = train_test_idxs, **pp_args)
+
+        pp_data = preprocess_data(data, standardize = True, train_test_idxs = train_test_idxs, **pp_args)
 
         # Fitting/predicting differently for direct classification/regression vs. hurdle models
         if verbose:
             print('  training model')
         if direct is None:
-            if pp_args['dataset'] == 'both':
-                mammal_train, mammal_test = pp_data_mammals.iloc[mammal_train_idx].copy(deep = True), pp_data_mammals.iloc[mammal_test_idx].copy(deep = True)
-                bird_train, bird_test = pp_data_birds.iloc[bird_train_idx].copy(deep = True), pp_data_birds.iloc[bird_test_idx].copy(deep = True)
-
-                #  putting data back together again
-                train_data, test_data = pd.concat((mammal_train, bird_train), axis = 0), pd.concat((mammal_test, bird_test), axis = 0)
-            else:
-                train_data, test_data = pp_data.iloc[train_idx].copy(deep = True), pp_data.iloc[test_idx].copy(deep = True)
+            train_data, test_data = pp_data.iloc[train_test_idxs['train']].copy(deep = True), pp_data.iloc[train_test_idxs['test']].copy(deep = True)
 
             #  clone the model to ensure it fits from scratch... Pymer submodels do this through the wrapper class
             #   at fit time and AutoML instances do this when "keep_search_state" is False
@@ -236,12 +217,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
             pred_DI_cats = ratios_to_DI_cats(y_pred)
 
         # Save predictions and true values for this test set
-        if pp_args['dataset'] == 'both':
-            test_idxs = list(mammal_train_test_idxs['test']) + list(bird_train_test_idxs['test'] + len(mammal_data))
-        else:
-            test_idxs = train_test_idxs['test']
-
-        all_preds['index'].extend(test_idxs)
+        all_preds['index'].extend(train_test_idxs['test'])
         all_preds['fold'].extend([i for k in range(len(y_test))])
         all_preds['actual'].extend(y_test)
         all_preds['predicted'].extend(y_pred)
