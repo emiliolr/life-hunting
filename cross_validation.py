@@ -115,23 +115,68 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
     for m in reg_metrics:
         metric_dict[m] = []
 
-    # Running the k-fold cross-validation
-    lat, lon = ('Y', 'X') if pp_args['dataset'] == 'mammals' else ('Latitude', 'Longitude')
+    # Getting data splits for cross-validation
+    lat, lon = ('Y', 'X') if pp_args['dataset'] in ['mammals', 'both'] else ('Latitude', 'Longitude')
     coords = data[[lon, lat]].values
 
+    #  some logic for data splitting based on the dataset
+    if pp_args['dataset'] == 'both':
+        mammal_mask = data['Class'] == 'Mammalia'
+        split_mammals = kfold.split(coords[mammal_mask], groups = groups)
+
+        bird_mask = data['Class'] == 'Aves'
+        split_birds = kfold.split(coords[bird_mask], groups = groups)
+
+        splits = zip(split_mammals, split_birds)
+    else:
+        splits = kfold.split(coords, groups = groups)
+
+    # Data structure for saving predictions
     all_preds = {'index' : [], 'fold' : [], 'actual' : [], 'predicted' : []}
-    for i, (train_idx, test_idx) in enumerate(kfold.split(coords, groups = groups)):
+
+    # Running the k-fold cross-validation
+    for i, split in enumerate(splits):
         if verbose:
             print(f'Fold {i}:')
 
-        train_test_idxs = {'train' : train_idx, 'test' : test_idx}
-        pp_data = preprocess_data(data, standardize = True, train_test_idxs = train_test_idxs, **pp_args)
+        #  preprocessing data - a bit different if using both datasets, so that we
+        #   are sure to get the same splits as the single-dataset case!
+        if pp_args['dataset'] == 'both':
+            (mammal_train_idx, mammal_test_idx), (bird_train_idx, bird_test_idx) = split
+
+            # TODO: I think it would be better practice to preprocess ALL data - that way standardization
+            #  actually is consistent, i.e., z-scores are based on ALL data!
+
+            #  preprocess mammal data points
+            mammal_train_test_idxs = {'train' : mammal_train_idx, 'test' : mammal_test_idx}
+            mammal_data = data[mammal_mask].copy(deep = True)
+            pp_data_mammals = preprocess_data(mammal_data, standardize = True,
+                                              train_test_idxs = mammal_train_test_idxs,
+                                              **pp_args)
+
+            #  preprocess bird data points
+            bird_train_test_idxs = {'train' : bird_train_idx, 'test' : bird_test_idx}
+            bird_data = data[bird_mask].copy(deep = True)
+            pp_data_birds = preprocess_data(bird_data, standardize = True,
+                                            train_test_idxs = bird_train_test_idxs,
+                                            **pp_args)
+        else:
+            train_idx, test_idx = split
+            train_test_idxs = {'train' : train_idx, 'test' : test_idx}
+            pp_data = preprocess_data(data, standardize = True, train_test_idxs = train_test_idxs, **pp_args)
 
         # Fitting/predicting differently for direct classification/regression vs. hurdle models
         if verbose:
             print('  training model')
         if direct is None:
-            train_data, test_data = pp_data.iloc[train_idx].copy(deep = True), pp_data.iloc[test_idx].copy(deep = True)
+            if pp_args['dataset'] == 'both':
+                mammal_train, mammal_test = pp_data_mammals.iloc[mammal_train_idx].copy(deep = True), pp_data_mammals.iloc[mammal_test_idx].copy(deep = True)
+                bird_train, bird_test = pp_data_birds.iloc[bird_train_idx].copy(deep = True), pp_data_birds.iloc[bird_test_idx].copy(deep = True)
+
+                #  putting data back together again
+                train_data, test_data = pd.concat((mammal_train, bird_train), axis = 0), pd.concat((mammal_test, bird_test), axis = 0)
+            else:
+                train_data, test_data = pp_data.iloc[train_idx].copy(deep = True), pp_data.iloc[test_idx].copy(deep = True)
 
             #  clone the model to ensure it fits from scratch... Pymer submodels do this through the wrapper class
             #   at fit time and AutoML instances do this when "keep_search_state" is False
@@ -159,7 +204,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
             #  predicting on the test set
             y_pred = model.predict(test_data)
 
-            resp_col = 'ratio' if pp_args['dataset'] == 'mammals' else 'RR'
+            resp_col = 'ratio' if pp_args['dataset'] in ['mammals', 'both'] else 'RR'
             y_test = test_data[resp_col].copy(deep = True)
 
             #  back-transforming to go from RRs --> ratios
@@ -167,6 +212,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
                 y_pred[y_pred != 0] = np.exp(y_pred[y_pred != 0])
         else:
             assert direct in ['classification', 'regression'], 'The "direct" argument must either be "classification" or "regression."'
+            assert pp_data['dataset'] != 'both', 'Training/testing on both datasets is only supported for hurdle models.'
 
             #  getting the data split
             X_train, y_train, X_test, y_test = direct_train_test(pp_data, task = direct, already_pp = True,
@@ -179,10 +225,6 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
             #  predicting on the test set
             y_pred = model.predict(X_test)
 
-        # Get predictions and targets
-        if verbose:
-            print('  getting test metrics')
-
         # Discretize ratios for regression models to get classification metrics
         #  - case where our predictions are already in the form of DI categories
         if direct == 'classification':
@@ -194,34 +236,47 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
             pred_DI_cats = ratios_to_DI_cats(y_pred)
 
         # Save predictions and true values for this test set
-        all_preds['index'].extend(train_test_idxs['test'])
+        if pp_args['dataset'] == 'both':
+            test_idxs = list(mammal_train_test_idxs['test']) + list(bird_train_test_idxs['test'] + len(mammal_data))
+        else:
+            test_idxs = train_test_idxs['test']
+
+        all_preds['index'].extend(test_idxs)
         all_preds['fold'].extend([i for k in range(len(y_test))])
         all_preds['actual'].extend(y_test)
         all_preds['predicted'].extend(y_pred)
 
-        # Get regression test metrics for this train/test split
-        for metric in reg_metrics.keys():
-            kws = reg_metrics[metric]['kwargs']
-            metric_dict[metric].append(reg_metrics[metric]['function'](y_test, y_pred, **kws))
+        # Get metrics
+        if pp_args['dataset'] in ['mammals', 'birds']:
+            if verbose:
+                print('  getting test metrics')
 
-        # Get per-class classification metrics
-        for c in classes:
-            #  binarizing the true/pred labels
-            true = (true_DI_cats == c).astype(int)
-            pred = (pred_DI_cats == c).astype(int)
+            #  get regression test metrics for this train/test split
+            for metric in reg_metrics.keys():
+                kws = reg_metrics[metric]['kwargs']
+                metric_dict[metric].append(reg_metrics[metric]['function'](y_test, y_pred, **kws))
 
-            for metric in class_metrics['per_class'].keys():
-                kws = class_metrics['per_class'][metric]['kwargs']
-                metric_dict[metric][classes[c]].append(class_metrics['per_class'][metric]['function'](true, pred, **kws))
+            #  get per-class classification metrics
+            for c in classes:
+                #  binarizing the true/pred labels
+                true = (true_DI_cats == c).astype(int)
+                pred = (pred_DI_cats == c).astype(int)
 
-        # Get overall classification metrics
-        for metric in class_metrics['overall'].keys():
-            kws = class_metrics['overall'][metric]['kwargs']
-            metric_dict[metric].append(class_metrics['overall'][metric]['function'](true_DI_cats, pred_DI_cats, **kws))
+                for metric in class_metrics['per_class'].keys():
+                    kws = class_metrics['per_class'][metric]['kwargs']
+                    metric_dict[metric][classes[c]].append(class_metrics['per_class'][metric]['function'](true, pred, **kws))
+
+            #  get overall classification metrics
+            for metric in class_metrics['overall'].keys():
+                kws = class_metrics['overall'][metric]['kwargs']
+                metric_dict[metric].append(class_metrics['overall'][metric]['function'](true_DI_cats, pred_DI_cats, **kws))
 
     # Formatting prediction saves and adding to the metric dictionary
     all_preds = pd.DataFrame(all_preds)
-    all_preds = all_preds.set_index('index')
+    all_preds = all_preds.set_index('index').sort_index()
+    if pp_args['dataset'] == 'both':
+        all_preds['dataset'] = (['mammals'] * len(data[mammal_mask])) + (['birds'] * len(data[bird_mask]))
+
     metric_dict['raw_preds'] = all_preds
 
     return metric_dict
@@ -319,79 +374,82 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
         in a dataframe format
     """
 
-    # Setting mutable defaults
-    assert (class_metrics is not None) or (reg_metrics is not None), 'Make sure one of "class_metrics" or "reg_metrics" is not None.'
-    assert len(metrics_dict) > 0, 'The inputted "metrics_dict" has no entries.'
+    block_name = cross_val_params['block_type'] if cross_val_params['block_type'] is not None else 'random'
 
-    if class_metrics is None:
-        class_metrics = {'per_class' : {}, 'overall' : {}}
-    if reg_metrics is None:
-        reg_metrics = {}
-    if vals_to_save is None:
-        vals_to_save = ['metrics', 'raw']
+    if dataset != 'both':
+        # Setting mutable defaults
+        assert (class_metrics is not None) or (reg_metrics is not None), 'Make sure one of "class_metrics" or "reg_metrics" is not None.'
+        assert len(metrics_dict) > 0, 'The inputted "metrics_dict" has no entries.'
 
-    # Cleaning per-class classification metrics
-    per_class_dict = {m : metrics_dict[m] for m in class_metrics['per_class']}
-    if len(per_class_dict) > 0:
-        per_class_results = format_cv_results(per_class_dict, class_metrics, reg_metrics, result_type = 'per_class')
-    else:
-        per_class_results = None
+        if class_metrics is None:
+            class_metrics = {'per_class' : {}, 'overall' : {}}
+        if reg_metrics is None:
+            reg_metrics = {}
+        if vals_to_save is None:
+            vals_to_save = ['metrics', 'raw']
 
-    # Cleaning overall classification metrics
-    overall_dict = {m : metrics_dict[m] for m in class_metrics['overall']}
-    if len(overall_dict) > 0:
-        overall_results = format_cv_results(overall_dict, class_metrics, reg_metrics, result_type = 'overall')
-    else:
-        overall_results = None
-
-    # Cleaning regression metrics
-    reg_dict = {m : metrics_dict[m] for m in reg_metrics}
-    if len(reg_dict) > 0:
-        reg_results = format_cv_results(reg_dict, class_metrics, reg_metrics, result_type = 'regression')
-    else:
-        reg_results = None
-
-    # Merging the cleaned results dataframes
-    columns = ['DI_category', 'metric', 'mean', 'std']
-    final_results = pd.DataFrame({c : [np.nan] for c in columns}) # empty dataframe to add on to
-
-    if per_class_results is not None:
-        final_results = pd.concat((final_results, per_class_results.reset_index()))
-    if overall_results is not None:
-        final_results = pd.concat((final_results, overall_results.reset_index()))
-    if reg_results is not None:
-        final_results = pd.concat((final_results, reg_results.reset_index()))
-
-    final_results = final_results.reset_index(drop = True).dropna(axis = 0, how = 'all')
-
-    #  adding on some last few bits of information
-    final_results = final_results.rename(columns = {'std' : 'standard_deviation'})
-    final_results['DI_category'] = final_results['DI_category'].fillna('overall')
-    final_results['date'] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-    final_results['model_name'] = model_name
-    final_results['dataset'] = dataset
-
-    #  adding info about the cross-val setup
-    final_results['num_folds'] = cross_val_params['num_folds']
-    final_results['block_type'] = cross_val_params['block_type'] if cross_val_params['block_type'] is not None else 'random'
-    final_results['spatial_spacing'] = cross_val_params['spatial_spacing'] if cross_val_params['block_type'] == 'spatial' else np.nan
-    final_results['group_col'] = cross_val_params['group_col'] if cross_val_params['block_type'] == 'group' else np.nan
-
-    # Saving to the inputted file
-    if 'metrics' in vals_to_save:
-        save_filename = os.path.join(save_fp, 'cross_val_results.csv')
-        if os.path.isfile(save_filename):
-            existing_results = pd.read_csv(save_filename)
-            all_results = pd.concat((existing_results, final_results))
-            all_results.to_csv(save_filename, index = False)
+        # Cleaning per-class classification metrics
+        per_class_dict = {m : metrics_dict[m] for m in class_metrics['per_class']}
+        if len(per_class_dict) > 0:
+            per_class_results = format_cv_results(per_class_dict, class_metrics, reg_metrics, result_type = 'per_class')
         else:
-            final_results.to_csv(save_filename, index = False)
+            per_class_results = None
+
+        # Cleaning overall classification metrics
+        overall_dict = {m : metrics_dict[m] for m in class_metrics['overall']}
+        if len(overall_dict) > 0:
+            overall_results = format_cv_results(overall_dict, class_metrics, reg_metrics, result_type = 'overall')
+        else:
+            overall_results = None
+
+        # Cleaning regression metrics
+        reg_dict = {m : metrics_dict[m] for m in reg_metrics}
+        if len(reg_dict) > 0:
+            reg_results = format_cv_results(reg_dict, class_metrics, reg_metrics, result_type = 'regression')
+        else:
+            reg_results = None
+
+        # Merging the cleaned results dataframes
+        columns = ['DI_category', 'metric', 'mean', 'std']
+        final_results = pd.DataFrame({c : [np.nan] for c in columns}) # empty dataframe to add on to
+
+        if per_class_results is not None:
+            final_results = pd.concat((final_results, per_class_results.reset_index()))
+        if overall_results is not None:
+            final_results = pd.concat((final_results, overall_results.reset_index()))
+        if reg_results is not None:
+            final_results = pd.concat((final_results, reg_results.reset_index()))
+
+        final_results = final_results.reset_index(drop = True).dropna(axis = 0, how = 'all')
+
+        #  adding on some last few bits of information
+        final_results = final_results.rename(columns = {'std' : 'standard_deviation'})
+        final_results['DI_category'] = final_results['DI_category'].fillna('overall')
+        final_results['date'] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+        final_results['model_name'] = model_name
+        final_results['dataset'] = dataset
+
+        #  adding info about the cross-val setup
+        final_results['num_folds'] = cross_val_params['num_folds']
+        final_results['block_type'] = block_name
+        final_results['spatial_spacing'] = cross_val_params['spatial_spacing'] if cross_val_params['block_type'] == 'spatial' else np.nan
+        final_results['group_col'] = cross_val_params['group_col'] if cross_val_params['block_type'] == 'group' else np.nan
+
+        # Saving to the inputted file
+        if 'metrics' in vals_to_save:
+            save_filename = os.path.join(save_fp, 'cross_val_results.csv')
+            if os.path.isfile(save_filename):
+                existing_results = pd.read_csv(save_filename)
+                all_results = pd.concat((existing_results, final_results))
+                all_results.to_csv(save_filename, index = False)
+            else:
+                final_results.to_csv(save_filename, index = False)
 
     # Saving the raw predictions
     if 'raw' in vals_to_save:
         raw_preds = metrics_dict['raw_preds']
 
-        save_filename = f'{model_name}_{dataset}_{cross_val_params["num_folds"]}-fold_{final_results["block_type"].iloc[0]}-blocking'
+        save_filename = f'{model_name}_{dataset}_{cross_val_params["num_folds"]}-fold_{block_name}-blocking'
         if cross_val_params['block_type'] == 'spatial':
             save_filename += f'_{cross_val_params["spatial_spacing"]}-degree'
         elif cross_val_params['block_type'] == 'group':
@@ -401,4 +459,5 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
         preds_fp = os.path.join(save_fp, 'raw_predictions', save_filename)
         raw_preds.to_csv(preds_fp)
 
-    return final_results
+    if dataset != 'both':
+        return final_results

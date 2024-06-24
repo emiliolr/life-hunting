@@ -72,6 +72,8 @@ def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_t
     train_test_idxs : dictionary
         a dictionary containing entries 'train' and 'test', with lists of indices
         for each
+    satclip_L : integer
+        the degree of the spherical harmonics in SatCLIP; either 10 or 40
 
     Returns
     -------
@@ -94,7 +96,7 @@ def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_t
         #  this only loads location encoder by default
         with utils.HiddenPrints():
             model = get_satclip(hf_hub_download(f'microsoft/SatCLIP-ResNet50-L{satclip_L}',
-                                                f'satclip-resnet50-l{satclip_L}.ckpt'), # using the higher-resolution model by default...
+                                                f'satclip-resnet50-l{satclip_L}.ckpt'),
                                 device = device)
         model.eval()
 

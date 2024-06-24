@@ -369,13 +369,19 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     """
 
     # Default predictors
-    if dataset == 'mammals':
+    if dataset in ['mammals', 'both']:
         if indicator_columns is None:
-            indicator_columns = ['Country', 'Species', 'Study', 'Family']
+            indicator_columns = ['Country', 'Species']
+            if dataset == 'mammals':
+                indicator_columns += ['Study', 'Family']
         if nonzero_columns is None:
             nonzero_columns = ['BM', 'DistKm', 'PopDens']
+            if dataset == 'both':
+                nonzero_columns += ['TravTime', 'Stunting', 'Reserve']
         if zero_columns is None:
             zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'Reserve']
+            if dataset == 'both':
+                zero_columns += ['TravTime']
     elif dataset == 'birds':
         if indicator_columns is None:
             indicator_columns = ['Country', 'Species']
@@ -388,7 +394,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
                             'FoodBiomass', 'Forest_cover', 'NPP', 'Body_Mass',
                             'Reserve']
     else:
-        raise ValueError('The only supported datasets are "mammals" and "birds".')
+        raise ValueError('The only supported datasets are "mammals," "birds," or "both".')
 
     if embeddings_to_use is None:
         embeddings_to_use = []
@@ -412,7 +418,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
 
     # Extracting the inputs/outputs for each of the models in the case where we have labels
     if not pred:
-        resp_col = 'ratio' if dataset == 'mammals' else 'RR'
+        resp_col = 'ratio' if dataset in ['mammals', 'both'] else 'RR'
         ratio = pp_data[resp_col].values
         nonzero_mask = (ratio != 0)
         outlier_mask = ratio < outlier_cutoff # only keeping values smaller than cutoff - ratio is always positive!
@@ -474,11 +480,11 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         embeddings_args = {}
 
     # Defining the variables needed
-    if dataset == 'mammals':
-        indicator_columns = ['Country', 'Species', 'Study', 'Family', 'Order',
-                             'Region', 'Diet']
+    if dataset in ['mammals', 'both']:
+        indicator_columns = ['Country', 'Species', 'Family',
+                             'Order'] + (['Diet', 'Study', 'Region'] if dataset == 'mammals' else [])
         continuous_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime',
-                              'LivestockBio', 'Literacy']
+                              'LivestockBio'] + (['Literacy'] if dataset == 'mammals' else [])
         special_columns = ['Reserve']
         response_column = 'ratio'
     elif dataset == 'birds':
@@ -489,18 +495,18 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         special_columns = ['Reserve']
         response_column = 'RR'
     else:
-        raise ValueError('The only supported datasets are "mammals" and "birds".')
+        raise ValueError('The only supported datasets are "mammals," "birds," or "both".')
 
     # Grabbing just the fixed-effects predictors
     pp_data = data[continuous_columns + special_columns].copy(deep = True)
 
     # Turning reserve into an indicator variable - not needed for bird dataset!
-    if dataset == 'mammals':
+    if dataset in ['mammals', 'both']:
         pp_data['Reserve'] = (pp_data['Reserve'] == 'Yes').astype(int)
 
     # Optionally adding a polynomial basis expansion
     if polynomial_features > 1:
-        reserve = pp_data['Reserve'].copy(deep = True)
+        reserve = pp_data['Reserve'].copy(deep = True).reset_index(drop = True)
 
         poly = PolynomialFeatures(polynomial_features, include_bias = False)
         pp_data_poly = poly.fit_transform(pp_data.drop(columns = ['Reserve']))
@@ -517,7 +523,7 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
 
     # Optionally standardizing continuous predictors
     if standardize:
-        reserve = pp_data['Reserve'].copy(deep = True)
+        reserve = pp_data['Reserve'].copy(deep = True).reset_index(drop = True)
 
         #  if we were supplied train indices, only using those stats for standardization
         if train_test_idxs is not None:
@@ -536,10 +542,10 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
 
     # Optionally adding indicator (or straight categorical) variables for different groups present in data
     if include_indicators:
-        pp_data = pd.concat((pp_data, data[indicator_columns].copy(deep = True)), axis = 1)
+        pp_data = pd.concat((pp_data, data[indicator_columns].copy(deep = True).reset_index(drop = True)), axis = 1)
         pp_data = pd.get_dummies(pp_data, dtype = float, drop_first = True, columns = indicator_columns)
     elif include_categorical:
-        pp_data = pd.concat((pp_data, data[indicator_columns].copy(deep = True)), axis = 1)
+        pp_data = pd.concat((pp_data, data[indicator_columns].copy(deep = True).reset_index(drop = True)), axis = 1)
 
     # Optionally adding DL embeddings as predictors
     if embeddings_to_use is not None:
@@ -548,7 +554,7 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         pp_data = pd.concat((pp_data, all_embeddings), axis = 1) # this should be fine since both DFs are sorted by index
 
     # Add back in the response variable
-    pp_data[response_column] = data[response_column]
+    pp_data[response_column] = data[response_column].reset_index(drop = True)
 
     return pp_data
 
@@ -707,22 +713,39 @@ if __name__ == '__main__':
     gdrive_fp = config['gdrive_path']
     LIFE_fp = config['LIFE_folder']
     dataset_fp = config['datasets_path']
-
-    # Grabbing dataset
     benitez_lopez2019 = config['indiv_data_paths']['benitez_lopez2019']
+    ferreiro_arias2024 = config['indiv_data_paths']['ferreiro_arias2024']
+
     ben_lop_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019)
+    fer_ari_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024)
+
     ben_lop2019 = read_csv_non_utf(ben_lop_path)
+    fer_ari2024 = pd.read_csv(fer_ari_path)
 
-    train_test_idxs = get_train_test_split(len(ben_lop2019))
-    pp_data = preprocess_data(ben_lop2019, include_indicators = False, include_categorical = False,
+    cols = ['Order', 'Family', 'Species', 'ratio', 'X', 'Y', 'Country', 'BM', 'DistKm', 'PopDens',
+            'Stunting', 'TravTime', 'LivestockBio', 'Reserve']
+    ben_lop2019 = ben_lop2019[cols]
+    ben_lop2019['Class'] = 'Mammalia'
+
+    cols = ['Order', 'Family', 'Species', 'RR', 'Latitude', 'Longitude', 'Country', 'Body_Mass',
+            'Dist_Hunters', 'PopDens', 'Stunting', 'TravDist', 'FoodBiomass', 'Reserve']
+    fer_ari2024 = fer_ari2024[cols]
+    fer_ari2024['Class'] = 'Aves'
+    fer_ari2024['Reserve'] = fer_ari2024['Reserve'].replace({0 : 'No', 1 : 'Yes'}) # aligning the coding of this binary columns to the mammal dataset
+
+    fer_ari2024 = fer_ari2024.rename(columns = {'RR' : 'ratio', 'Longitude' : 'X', 'Latitude' : 'Y',
+                                                'Dist_Hunters' : 'DistKm', 'TravDist' : 'TravTime',
+                                                'FoodBiomass' : 'LivestockBio', 'Body_Mass' : 'BM'})
+
+    data = pd.concat((ben_lop2019, fer_ari2024), join = 'inner', axis = 0, ignore_index = True)
+
+    train_test_idxs = get_train_test_split(len(data))
+    pp_data = preprocess_data(data, include_indicators = False, include_categorical = True,
                               standardize = True, log_trans_cont = False, polynomial_features = 0,
-                              embeddings_to_use = ['SatCLIP', 'BioCLIP'], embeddings_args = {'pca' : False},
-                              train_test_idxs = train_test_idxs, dataset = 'mammals')
+                              embeddings_to_use = None, train_test_idxs = train_test_idxs, dataset = 'both')
+    # X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, outlier_cutoff = np.Inf, extirp_pos = False,
+    #                                                                  zero_columns = None, nonzero_columns = None, indicator_columns = None,
+    #                                                                  embeddings_to_use = None, dataset = 'both')
 
-    print(pp_data.shape)
-    print()
-    print(pp_data.head())
-    print()
-    print(pp_data.columns[~np.isclose(pp_data.iloc[train_test_idxs['train']].mean(axis = 0), 0)])
-    print()
-    print(pp_data.columns[~np.isclose(pp_data.iloc[train_test_idxs['train']].std(axis = 0), 1, atol = 0.001)])
+    print(pp_data)
+    print(pp_data.isna().sum())
