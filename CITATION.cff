@@ -9,7 +9,7 @@ authors:
 - family-names: Balmford
   given-names: Andrew
 title: "Code Repository for: Quantifying Species-Specific Responses to Hunting Pressure"
-version: 1.0.0
-doi: 10.5281/zenodo.1234
-date-released: 2024-06-28
+version: 1.0
+doi: 10.5281/zenodo.12571509
+date-released: 2024-06-27
 url: "https://github.com/emiliolr/life-hunting"
