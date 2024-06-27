@@ -5,7 +5,9 @@
 *.pkl
 *.log
 *.csv
+
 *.pdf
+!MRes_Project_Report.pdf
 
 *.png
 !ai4er_logo.png
