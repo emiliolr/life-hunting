@@ -11,7 +11,7 @@ This work was carried out as my Master of Research (MRes) project for the [Artif
 
 ## Documentation
 
-For a high-level overview of the structure of the repository, please see DOCUMENTATION.md **(ADD THIS FILE)**; this file covers local setup for the repository, contains a description of the uses of each script or notebook, and details the relevant notebook to use to reproduce figures from the report. 
+For a high-level overview of the structure of the repository, please see [`DOCUMENTATION.md`](DOCUMENTATION.md); this file covers local setup for the repository, contains a description of the uses of each script or notebook, and details the relevant notebook to use to reproduce figures from the report. 
 
 Each file is thoroughly documented and should be relatively self-explanatory. Python notebooks (`*.ipynb`) include markdown cells with headers describing each section's functionality and are relatively well commented. Python files (`*.py`) contain substantial documentation in the form of function docstrings; each function includes a short description of the implemented functionality and explanation of all function parameters/returns.
 
