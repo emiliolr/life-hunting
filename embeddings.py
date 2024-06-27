@@ -32,7 +32,7 @@ def get_record_species_embedding(species_list, embedding_dict):
 
     """
     A helper function to extract the mean embedding for each record. This is designed
-    to be applied to a sandas series.
+    to be applied to a pandas series.
 
     Paramaters
     ----------
@@ -185,6 +185,23 @@ def get_all_embeddings(ben_lop_data, pca = False, var_cutoff = 0.9, embeddings_t
     return all_emb
 
 def multi_species_extraction(species_names):
+
+    """
+    A function to handle the case where multiple species are present for a single observation
+    or an observation is at a higher taxonomic level. This is meant for use with Benitez-Lopez
+    et al. (2019).
+
+    Paramaters
+    ----------
+    species_names : string
+        a string containing one or more species
+
+    Returns
+    -------
+    species_names : list
+        a list with all species names found
+    """
+
     if ', ' in species_names:
         species_names = species_names.split(',')
         species_names = [s.split('and ') for s in species_names]
@@ -223,6 +240,16 @@ def multi_species_extraction(species_names):
     return species_names
 
 def read_dataset():
+
+    """
+    A helper function to read the Benitez-Lopez et al. (2019) dataset.
+
+    Returns
+    -------
+    ben_lop2019 : pandas.DataFrame
+        Benitez-Lopez et al. (2019) dataset
+    """
+
     # Loading in general configuration
     with open(os.path.join(dir_to_add, 'config.json'), 'r') as f:
         config = json.load(f)
@@ -240,6 +267,22 @@ def read_dataset():
     return ben_lop2019
 
 def get_higher_level_dicts(higher_tax_level):
+
+    """
+    A specialized function to extract the full taxonomic hierarchy when only a level
+    higher than species is indicated for a record.
+
+    Paramaters
+    ----------
+    higher_tax_level : list
+        a list of taxonomic names (e.g., Genus)
+
+    Returns
+    -------
+    higher_tax_full : list
+        a list containing the corresponding full taxonomic hierarchy
+    """
+
     higher_tax_full = []
 
     for name in tqdm(higher_tax_level):
@@ -273,6 +316,24 @@ def get_higher_level_dicts(higher_tax_level):
     return higher_tax_full
 
 def get_species_dicts(full_species, species_resolved):
+
+    """
+    A helper function to get the full taxonomic hierarchy when species names are
+    present.
+
+    Paramaters
+    ----------
+    full_species : list
+        a list of the original scientific binomials from Benitez-Lopez et al. (2019)
+    species_resolved : list
+        a list of resolved scientific binomials
+
+    Returns
+    -------
+    full_names : list
+        a list containing the corresponding full taxonomic hierarchy
+    """
+
     species_itis = {}
     for s, s_dict in zip(full_species, species_resolved):
         if s == 'Smutsia gigantea':
@@ -294,6 +355,12 @@ def get_species_dicts(full_species, species_resolved):
     return full_names
 
 def main():
+
+    """
+    A wrapper for obtaining species embeddings, to be run as a script. Results are
+    saved to 'embeddings/bioclip_embeddings.json'.
+    """
+
     # Getting the dataset
     ben_lop2019 = read_dataset()
 

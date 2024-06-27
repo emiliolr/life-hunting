@@ -162,17 +162,3 @@ def get_regression_report(true_ratios, pred_ratios, save_dir = None, model_name 
     if save_dir is not None:
         with open(os.path.join(base_dir, 'regression_report.txt'), 'w') as f:
             f.write(save_str)
-
-if __name__ == '__main__':
-    import numpy as np
-
-    cls = [0, 1, 2]
-    true_DI_cats = np.random.choice(cls, size = 100)
-    pred_DI_cats = np.random.choice(cls, size = 100)
-
-    get_classification_report(true_DI_cats, pred_DI_cats, save_dir = 'model_saves', model_name = 'test', printout = True)
-
-    true_ratios = np.random.normal(loc = 0.5, scale = 0.25, size = 100)
-    pred_ratios = np.random.normal(loc = 0.5, scale = 0.3, size = 100)
-
-    get_regression_report(true_ratios, pred_ratios, save_dir = 'model_saves', model_name = 'test', printout = True)
