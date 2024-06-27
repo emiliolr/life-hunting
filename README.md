@@ -1,4 +1,4 @@
-# AI4ER MRes Project 2024 - "Quantifying Species-Specific Abundance Responses to Hunting Pressure"
+# Quantifying Species-Specific Abundance Responses to Hunting Pressure
 
 ## Project Description
 
