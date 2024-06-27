@@ -6,12 +6,12 @@ For local setup, I recommend using [`conda`](https://conda.io/projects/conda/en/
 1. Clone this GitHub repository. Be sure to use `git clone --recursive <HTTPS or SSH>` to ensure the `satclip` submodule is properly loaded.
 2. Navigate to the base directory of your local version of the repository.
 3. Open `environment.yml` and replace the "prefix" field with the directory to your `conda` or `mamba` installation.
-  - This can be found using `conda info --envs`: copy the path to the base environment and append `envs/life-hunting`.
+   - This can be found using `conda info --envs`: copy the path to the base environment and append `envs/life-hunting`.
 4. Run `conda env create -f environment.yml`.
 5. Activate the newly created environment using `conda activate life-hunting`.
 6. Run `pip install -r requirements.txt` to install the final dependencies.
 7. Replace the filepaths in `config.json`; the only two that are of importance for reproducing the results from the MRes report are the "benitez_lopez2019" and "ferreiro_arias2024" filepaths.
-  - See the repository [README](README.md) for details on how to download these datasets.
+   - See the repository [`README`](README.md) for details on how to download these datasets.
 
 ## Repository structure
 
