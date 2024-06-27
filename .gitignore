@@ -3,10 +3,13 @@
 *.DS_Store
 
 *.pkl
-*.png
 *.log
 *.csv
 *.pdf
+
+*.png
+!ai4er_logo.png
+!cambridge_logo.png
 
 *.txt
 !requirements.txt
