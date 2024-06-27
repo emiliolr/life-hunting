@@ -29,17 +29,17 @@ These are all in the base repository directory.
 
 **Python notebooks:**
 These are all located in the `notebooks/` directory:
-- `advanced_hurdle_models.ipynb`:
-- `autoML.ipynb`:
-- `basic_hurdle_model.ipynb`:
-- `cross_validation.ipynb`:
-- `data_exploration.ipynb:`
-- `designing_two_stage_novel_model.ipynb`:
-- `dl_embeddings.ipynb`:
-- `extracting_species_traits.ipynb`:
-- `extreme_generalisation.ipynb`:
-- `loading_spatial_data.ipynb`:
-- `visualizing_results.ipynb`:
+- `advanced_hurdle_models.ipynb`: Initial experimentation for a fixed-effects hurdle model using regularized logistic regression and regularized linear regression for the zero and nonzero components, respectively.
+- `autoML.ipynb`: Initial experimentation for automated machine learning using `FLAML`. Direct regression and classification are considered, as well as the hurdle model structure.
+- `basic_hurdle_model.ipynb`: Experiments for reproducing the previous state-of-the-art, a two-stage mixed-effects generalized linear hurdle model, implemented using `Pymer4` which directly accesses the `lme4` R package.
+- `cross_validation.ipynb`: All cross-validation experiments for all models, both datasets, and all blocking methods.
+- `data_exploration.ipynb`: Exploratory data analysis for the two datasets considered.
+- `designing_two_stage_novel_model.ipynb`: Initial experimentation for a novel two-stage model. This ultimately wasn't included in the MRes report due to time constraints.
+- `dl_embeddings.ipynb`: Initial exploration of deep learning species and spatial embeddings.
+- `extracting_species_traits.ipynb`: Initial exploration of methods to extract additional species predictors through auxiliary datasets. This ultimately wasn't included in the MRes report due to time constraints.
+- `extreme_generalisation.ipynb`: Experiments for extreme taxonomic and spatial model generalization, with a focus on the linear and nonlinear hurdle models.
+- `loading_spatial_data.ipynb`: Initial exploration of methods for interfacing with Google Earth Engine to extract additional spatial predictors. This ultimately wasn't included in the MRes report due to time constraints.
+- `visualizing_results.ipynb`: Plotting code to visualize results from both cross-validation and extreme generalization experiments.
 
 **Miscellaneous:**
-- `gee_scripts/`:
+- `gee_scripts/`: Copies of the Google Earth Engine scripts used to extract additional spatial predictors. This ultimately wasn't included in the MRes report due to time constraints. Please see the [`README`](gee_scripts/README.md) in the folder for additional details.
