@@ -1,5 +1,8 @@
 # Quantifying Species-Specific Abundance Responses to Hunting Pressure
 
+[![DOI](https://zenodo.org/badge/777825592.svg)](https://zenodo.org/doi/10.5281/zenodo.12571509) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+
 ## Project Description
 
 In this project, I present a comprehensive assessment of approaches for predicting how local species abundance will respond to hunting pressure. In particular, I reproduced the previous state-of-the art (a mixed-effects generalised linear hurdle model), thoroughly tested (nonlinear) predictive methods through application of automated machine learning, experimented with embeddings from pre-trained deep learning models as a supplement to existing spatial and species predictors, and closely inspected spatial and taxonomic generalisability using cross-validation. I found that nonlinear hurdle models tend to outperform the existing mixed-effects linear hurdle model baseline, especially when random effects are excluded during prediction. Deep learning embeddings were largely unhelpful as supplemental predictors, but could be used to reliably predict hunting pressure when used on their own in conjunction with the nonlinear hurdle model. Finally, spatial and taxonomic generalisation remained very difficult for all models tested, but improved in the presence of more training data. Through this work, I advance the state-of-the-art for this task and provide well-documented, reproducible code to support further predictive benchmarking for this task.
