@@ -1,28 +1,28 @@
-# life-hunting
-
-All code for my AI4ER MRes project with Andrew Balmford and Tom Swinfield at the University of Cambridge.
-
-# AI4ER MRes Project 2024
+# AI4ER MRes Project 2024 - "Quantifying Species-Specific Abundance Responses to Hunting Pressure"
 
 ## Project Description
 
-**Add project description!**
+In this project, I present a comprehensive assessment of approaches for predicting how local species abundance will respond to hunting pressure. In particular, I reproduced the previous state-of-the art (a mixed-effects generalised linear hurdle model), thoroughly tested (nonlinear) predictive methods through application of automated machine learning, experimented with embeddings from pre-trained deep learning models as a supplement to existing spatial and species predictors, and closely inspected spatial and taxonomic generalisability using cross-validation. I found that nonlinear hurdle models tend to outperform the existing mixed-effects linear hurdle model baseline, especially when random effects are excluded during prediction. Deep learning embeddings were largely unhelpful as supplemental predictors, but could be used to reliably predict hunting pressure when used on their own in conjunction with the nonlinear hurdle model. Finally, spatial and taxonomic generalisation remained very difficult for all models tested, but improved in the presence of more training data. Through this work, I advance the state-of-the-art for this task and provide well-documented, reproducible code to support further predictive benchmarking for this task.
 
-This work was carried out as part of the [Artificial Intelligence for Environmental Risks](https://ai4er-cdt.esc.cam.ac.uk/) (AI4ER) Centre for Doctoral Training Guided Team Challenge (GTC), which ran from November, 2023 to March, 2024.
+This work was carried out as my Master of Research (MRes) project for the [Artificial Intelligence for Environmental Risks](https://ai4er-cdt.esc.cam.ac.uk/) Centre for Doctoral Training (AI4ER CDT). Please see my full report **(ADD REPORT PDF)** for further details on the methodology and results.
 
 ## Documentation
+
+For a high-level overview of the structure of the repository, please see DOCUMENTATION.md **(ADD THIS FILE)**; this file covers local setup for the repository, contains a description of the uses of each script or notebook, and details the relevant notebook to use to reproduce figures from the report. 
+
+Each file is thoroughly documented and should be relatively self-explanatory. Python notebooks (`*.ipynb`) include markdown cells with headers describing each section's functionality and are relatively well commented. Python files (`*.py`) contain substantial documentation in the form of function docstrings; each function includes a short description of the implemented functionality and explanation of all function parameters/returns.
 
 -----
 
 ## Acknowledgements
 
-We would like to thank our faculty supervisors--Ali Mashayek, Laura Cimoli, and Alberto Naveira Garabato--as well as our project mentors--Josh Lanham and Kate Oglethorpe. Their guidance throughout was instrumental in our success as a team. We would also like to thank the AI4ER support staff--Annabelle Scott and Adriana Dote--for their help navigating the complex logistics of the GTC.
+I would like to thank my supervisors, Tom Swinfield and Andrew Balmford, for their guidance and insights throughout the project. I would also like to thank the AI4ER support staff, Annabelle Scott and Adriana Dote, for keeping the CDT running smoothly and for their support throughout the MRes year.
 
 -----
 
 ## License and Citation
 
-If you use the code in this repository, please consider citing it--see the [`citation.cff`](citation.cff) file or use the "Cite this repository" function on the right sidebar. All code is under the MIT license--see the [`LICENSE`](LICENSE) file.
+If you use the code in this repository, please consider citing it; see the [`citation.cff`](citation.cff) file or use the "Cite this repository" function on the right sidebar. All code is under the MIT license; see the [`LICENSE`](LICENSE) for further details.
 
 -----
 
