@@ -31,6 +31,26 @@ If you use the code in this repository, please consider citing it; see the [`CIT
 
 ## Data Availability
 
+### Hunting datasets
+
+**Tropical birds:**
+- [Full dataset](https://github.com/IagoFerreiroArias/Bird_Defaunation/blob/main/Data/Bird_RR_data.csv).
+- [Corresponding publication](https://doi.org/10.1111/ddi.13855).
+
+**Tropical mammals:**
+- [Full dataset](https://doi.org/10.6084/m9.figshare.6815288.v1).
+- [Corresponding publication](https://doi.org/10.1371/journal.pbio.3000247).
+
+### Deep learning embeddings
+
+**BioCLIP:** 
+- [Model weights](https://doi.org/10.57967/hf/1511).
+- [Project site](https://imageomics.github.io/bioclip/).
+
+**SatCLIP:**
+- [Model weights](https://huggingface.co/microsoft/SatCLIP-ResNet50-L40).
+- [Project repository](https://github.com/microsoft/satclip).
+
 -----
 
 <p align="middle">
