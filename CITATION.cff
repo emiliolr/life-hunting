@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: Luz-Ricca
+  given-names: Emilio
+  orcid: "https://orcid.org/0000-0002-4180-4123"
+- family-names: Swinfield
+  given-names: Thomas
+- family-names: Balmford
+  given-names: Andrew
+title: "Code Repository for: Quantifying Species-Specific Responses to Hunting Pressure"
+version: 1.0.0
+doi: 10.5281/zenodo.1234
+date-released: 2024-06-28
+url: "https://github.com/emiliolr/life-hunting"
