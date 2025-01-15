@@ -522,14 +522,11 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
 
     # Optionally adding a polynomial basis expansion
     if polynomial_features > 1:
-        # reserve = pp_data['Reserve'].copy(deep = True).reset_index(drop = True)
-
         poly = PolynomialFeatures(polynomial_features, include_bias = False)
         pp_data_poly = poly.fit_transform(pp_data.drop(columns = ['Reserve']))
 
         pp_data = pd.DataFrame(pp_data_poly, index = pp_data.index, columns = poly.get_feature_names_out())
         pp_data = pp_data.sort_index()
-        # pp_data['Reserve'] = reserve
 
     # Optionally log10 transforming continuous predictors
     if log_trans_cont:
@@ -539,8 +536,6 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
 
     # Optionally standardizing continuous predictors
     if standardize:
-        # reserve = pp_data['Reserve'].copy(deep = True).reset_index(drop = True)
-
         #  if we were supplied train indices, only using those stats for standardization
         if train_test_idxs is not None:
             scaler = StandardScaler()
@@ -554,7 +549,6 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         idx = pp_data.index if train_test_idxs is None else np.concatenate((train_test_idxs['train'], train_test_idxs['test']))
         pp_data = pd.DataFrame(pp_data_scaled, index = idx, columns = pp_data.columns)
         pp_data = pp_data.sort_index()
-        # pp_data['Reserve'] = reserve
 
     # Turning reserve into an indicator variable - not needed for bird dataset!
     if dataset in ['mammals', 'both'] and 'Reserve' in special_columns:

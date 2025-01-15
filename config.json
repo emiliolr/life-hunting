@@ -21,5 +21,10 @@
       "birds" : "BirdFuncDat.txt",
       "mammals" : "MamFuncDat.txt"
     }
-  }
+  },
+  "remote_machine_paths" : {
+      "benitez_lopez2019" : "/maps/el590/hunting_pressure_response/benitez_lopez2019/huntmamdata.csv",
+      "ferreiro_arias2024" : "/maps/el590/hunting_pressure_response/ferreiro_arias2024/Bird_RR_data.csv",
+      "ferreiro_arias2024_extended" : "/maps/el590/ferreiro_arias2024_extended/ferreiro_arias2024_extended.csv"
+    }
 }
