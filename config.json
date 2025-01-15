@@ -1,22 +1,23 @@
 {
   "gdrive_path" : "/Users/emiliolr/Google Drive/My Drive",
   "LIFE_folder" : "LIFE",
-  "datasets_path" : "MRes_datasets",
+  "datasets_path" : "datasets",
   "indiv_data_paths" : {
-    "benitez_lopez2019" : "hunting_effects/benitez_lopez2019/huntmamdata.csv",
-    "ferreiro_arias2024" : "hunting_effects/ferreiro_arias2024/Bird_RR_data.csv",
+    "benitez_lopez2019" : "hunting_pressure_response/benitez_lopez2019/huntmamdata.csv",
+    "ferreiro_arias2024" : "hunting_pressure_response/ferreiro_arias2024/Bird_RR_data.csv",
+    "ferreiro_arias2024_extended" : "derived_datasets/ferreiro_arias2024_extended/ferreiro_arias2024_extended.csv",
     "human_pop_density" : {
-      "base_path" : "socioeconomic/human_population_density",
+      "base_path" : "socioeconomic_predictors/human_population_density",
       "data_path" : "gpw-v4-population-density-rev11_{}_30_sec_tif/gpw_v4_population_density_rev11_{}_30_sec.tif",
       "avail_years" : [2000, 2005, 2010, 2015, 2020]
     },
     "protected_areas" : {
-      "base_path" : "socioeconomic/protected_areas",
+      "base_path" : "socioeconomic_predictors/protected_areas",
       "data_path" : "WDPA_Apr2024_Public_shp_{}/WDPA_Apr2024_Public_shp-polygons.shp",
       "subsets" : [0, 1, 2]
     },
     "elton_traits" : {
-      "base_path" : "species_traits/eltontraits1.0",
+      "base_path" : "species_trait_predictors/eltontraits1.0",
       "birds" : "BirdFuncDat.txt",
       "mammals" : "MamFuncDat.txt"
     }

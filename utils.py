@@ -336,7 +336,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     pp_data : pandas.DataFrame
         a dataframe containing preprocessed hunting effects data
     pred : boolean
-        will these be used for prediction? if False, labels (y_zero, y_nonzero)
+        will these be used for prediction? if True, labels (y_zero, y_nonzero)
         are not returned
     outlier_cutoff : float
         a positive number that indicates the largest abundance ratio to keep
@@ -353,8 +353,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     embeddings_to_use : list
         the name of the embeddings to use (i.e., 'SatCLIP' and/or 'BioCLIP')
     dataset : string
-        the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019) or
-        'birds' (Ferreiro-Arias et al., 2024)
+        the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019),
+        'birds' (Ferreiro-Arias et al., 2024), 'both', or 'birds_extended'
 
     Returns
     -------
@@ -393,8 +393,21 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
             zero_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting',
                             'FoodBiomass', 'Forest_cover', 'NPP', 'Body_Mass',
                             'Reserve']
+    elif dataset == 'birds_extended':
+        if indicator_columns is None:
+            indicator_columns = ['Country', 'Species']
+        if nonzero_columns is None:
+            nonzero_columns = ['Trophic_Niche', 'Dist_Hunters', 'TravDist', 'PopDens', 'Stunting', 
+                               'FoodBiomass', 'Forest_Cover', 'NPP', 'Range_Size', 'Body_Mass', 
+                               'Reserve', 'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Pet_Trade', 
+                               'IUCN_Is_Threatened', 'Habitat_Is_Dense']
+        if zero_columns is None:
+            zero_columns = ['Trophic_Niche', 'Dist_Hunters', 'TravDist', 'PopDens', 'Stunting', 
+                            'FoodBiomass', 'Forest_Cover', 'NPP', 'Range_Size', 'Body_Mass', 
+                            'Reserve', 'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Pet_Trade', 
+                            'IUCN_Is_Threatened', 'Habitat_Is_Dense']
     else:
-        raise ValueError('The only supported datasets are "mammals," "birds," or "both".')
+        raise ValueError('The only supported datasets are "mammals," "birds," "both", or "birds_extended".')
 
     if embeddings_to_use is None:
         embeddings_to_use = []
@@ -494,26 +507,29 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
                               'FoodBiomass', 'Forest_cover', 'NPP', 'Body_Mass']
         special_columns = ['Reserve']
         response_column = 'RR'
+    elif dataset == 'birds_extended':
+        indicator_columns = ['Trophic_Niche']
+        continuous_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting', 'FoodBiomass', 
+                              'Forest_Cover', 'NPP', 'Range_Size', 'Body_Mass']
+        special_columns = ['Reserve', 'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Pet_Trade', 
+                           'IUCN_Is_Threatened', 'Habitat_Is_Dense']
+        response_column = 'RR'
     else:
-        raise ValueError('The only supported datasets are "mammals," "birds," or "both".')
+        raise ValueError('The only supported datasets are "mammals," "birds," "both", or "birds_extended".')
 
-    # Grabbing just the fixed-effects predictors
-    pp_data = data[continuous_columns + special_columns].copy(deep = True)
-
-    # Turning reserve into an indicator variable - not needed for bird dataset!
-    if dataset in ['mammals', 'both']:
-        pp_data['Reserve'] = (pp_data['Reserve'] == 'Yes').astype(int)
+    # Grabbing just the continuous predictors
+    pp_data = data[continuous_columns].copy(deep = True)
 
     # Optionally adding a polynomial basis expansion
     if polynomial_features > 1:
-        reserve = pp_data['Reserve'].copy(deep = True).reset_index(drop = True)
+        # reserve = pp_data['Reserve'].copy(deep = True).reset_index(drop = True)
 
         poly = PolynomialFeatures(polynomial_features, include_bias = False)
         pp_data_poly = poly.fit_transform(pp_data.drop(columns = ['Reserve']))
 
         pp_data = pd.DataFrame(pp_data_poly, index = pp_data.index, columns = poly.get_feature_names_out())
         pp_data = pp_data.sort_index()
-        pp_data['Reserve'] = reserve
+        # pp_data['Reserve'] = reserve
 
     # Optionally log10 transforming continuous predictors
     if log_trans_cont:
@@ -523,7 +539,7 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
 
     # Optionally standardizing continuous predictors
     if standardize:
-        reserve = pp_data['Reserve'].copy(deep = True).reset_index(drop = True)
+        # reserve = pp_data['Reserve'].copy(deep = True).reset_index(drop = True)
 
         #  if we were supplied train indices, only using those stats for standardization
         if train_test_idxs is not None:
@@ -538,7 +554,16 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         idx = pp_data.index if train_test_idxs is None else np.concatenate((train_test_idxs['train'], train_test_idxs['test']))
         pp_data = pd.DataFrame(pp_data_scaled, index = idx, columns = pp_data.columns)
         pp_data = pp_data.sort_index()
-        pp_data['Reserve'] = reserve
+        # pp_data['Reserve'] = reserve
+
+    # Turning reserve into an indicator variable - not needed for bird dataset!
+    if dataset in ['mammals', 'both'] and 'Reserve' in special_columns:
+        pp_data['Reserve'] = (data['Reserve'] == 'Yes').astype(int)
+
+    # Adding other special columns
+    for col in special_columns:
+        if col not in pp_data.columns:
+            pp_data[col] = data[col].copy(deep = True)
 
     # Optionally adding indicator (or straight categorical) variables for different groups present in data
     if include_indicators:
@@ -701,3 +726,37 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
     y_train, y_test = train_data[target_col].values, test_data[target_col].values
 
     return X_train, y_train, X_test, y_test
+
+if __name__ == '__main__':
+    import json
+    
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+
+    gdrive_fp = config['gdrive_path']
+    LIFE_fp = config['LIFE_folder']
+    dataset_fp = config['datasets_path']
+    ferreiro_arias2024_ext = config['indiv_data_paths']['ferreiro_arias2024_extended']
+    
+    fer_ari_ext_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024_ext)
+
+    data = pd.read_csv(fer_ari_ext_path)
+
+    data['Trophic_Niche'] = data['Trophic_Niche'].apply(lambda x: x if x in ['Frugivore', 'Invertivore', 'Omnivore'] else 'Other')
+    data['IUCN_Is_Threatened'] = data['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
+    data['Habitat_Is_Dense'] = data['Habitat_Density'].apply(lambda x: 1 if x == 'Dense' else 0)
+    
+    data = data.drop(columns = ['IUCN_Category', 'Habitat_Density'])
+
+    pp_data = preprocess_data(data, include_indicators = True, include_categorical = False,
+                              standardize = True, log_trans_cont = False, polynomial_features = 0,
+                              embeddings_to_use = None, embeddings_args = None, train_test_idxs = None,
+                              dataset = 'birds_extended')
+    
+    X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, outlier_cutoff = np.Inf, extirp_pos = False,
+                                                                     zero_columns = None, nonzero_columns = None, indicator_columns = None,
+                                                                     embeddings_to_use = None, dataset = 'birds_extended')
+
+    print(X_zero.columns)
+    print('\n\n\n')
+    print(X_nonzero.columns)

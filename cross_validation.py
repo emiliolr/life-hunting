@@ -223,7 +223,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
         all_preds['predicted'].extend(y_pred)
 
         # Get metrics
-        if pp_args['dataset'] in ['mammals', 'birds']:
+        if pp_args['dataset'] != 'both':
             if verbose:
                 print('  getting test metrics')
 
