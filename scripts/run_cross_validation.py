@@ -44,7 +44,7 @@ def read_data(args):
         ben_lop_path = config['remote_machine_paths']['benitez_lopez2019']
         fer_ari_path = config['remote_machine_paths']['ferreiro_arias2024']
         fer_ari_ext_path = config['remote_machine_paths']['ferreiro_arias2024_extended']
-
+        
     # Reading in the dataset
     if args.dataset == 'birds':
         data = pd.read_csv(fer_ari_path)
@@ -114,7 +114,7 @@ def set_eval_metrics():
     
     return class_metrics, reg_metrics
     
-def run_cross_val(args, data, class_metrics, reg_metrics):
+def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
     # Pymer hurdle model, for sanity checking
     if args.model_to_use == 'pymer':
         #  setting up the equations for each model
@@ -396,8 +396,6 @@ def run_cross_val(args, data, class_metrics, reg_metrics):
         all_metric_names = list(class_metrics['per_class']) + list(class_metrics['overall']) + (list(reg_metrics.keys()) if reg_metrics is not None else [])
         print(f'Metrics: {all_metric_names}\n')
 
-    sys.exit()
-
     # Run the cross-validation using the inputted params
     metrics_dict = run_cross_val(model, data, block_type = args.block_type, num_folds = args.num_folds, 
                                  group_col = args.group_col, spatial_spacing = args.spatial_spacing, fit_args = fit_args, 
@@ -414,7 +412,8 @@ def save_results(args, metrics_dict, model_name, class_metrics, reg_metrics):
                         'spatial_spacing' : args.spatial_spacing,
                         'group_col' : args.group_col}
 
-    save_cv_results(metrics_dict, model_name, args.save_fp, cross_val_params, class_metrics, reg_metrics, args.vals_to_save, args.dataset)
+    save_cv_results(metrics_dict, model_name, args.save_fp, cross_val_params, class_metrics, reg_metrics,
+                    args.vals_to_save, args.dataset)
     print(f'Saved results at {args.save_fp}')
 
 def main(args):
@@ -425,58 +424,44 @@ def main(args):
     class_metrics, reg_metrics = set_eval_metrics()
 
     # Run the cross validation with the chosen parameters, metrics, and dataset
-    metrics_dict, model_name = run_cross_val(args, data, class_metrics, reg_metrics)
+    metrics_dict, model_name = set_up_and_run_cross_val(args, data, class_metrics, reg_metrics)
 
     # Save the result of the cross validation
-    save_cv_results(args, metrics_dict, model_name, class_metrics, reg_metrics)
+    save_results(args, metrics_dict, model_name, class_metrics, reg_metrics)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # DATASET PARAMS
     parser.add_argument('--gdrive', type = int, default = 1)
-    # gdrive = True
-
     parser.add_argument('--dataset', type = str, default = 'birds', choices = ['mammals', 'birds', 'birds_extended', 'both'])
-    # dataset = 'birds_extended' # "mammals", "birds", "birds_extended", or "both"
 
     # MODEL PARAMS
     parser.add_argument('--model_to_use', type = str, default = 'FLAML_hurdle', choices = ['pymer', 'sklearn', 'FLAML_hurdle', 'FLAML_regression', 'FLAML_classification'])
-    # model_to_use = 'FLAML_hurdle' # "pymer", "sklearn", "FLAML_hurdle", "FLAML_regression", "FLAML_classification"
-    
     parser.add_argument('--vals_to_save', type = str, nargs = '*', default = ['metrics'], choices = ['metrics', 'raw'])
-    # vals_to_save = ['metrics', 'raw']
 
     # CROSS-VALIDATION PARAMS
-    
     parser.add_argument('--num_folds', type = int, default = 5)
-    # num_folds = 5
-    
     parser.add_argument('--block_type', type = str, default = 'random', choices = ['random', 'group', 'spatial'])
-    # block_type = None
-    
     parser.add_argument('--group_col', type = str, default = 'species', choices = ['species'])
-    # group_col = 'species'
-    
     parser.add_argument('--spatial_spacing', type = int, default = 5)
-    # spatial_spacing = 5
+
+    # RESULTS SAVE PARAMS
+    parser.add_argument('--save_fp', type = str, default = '../phd_results')
 
     # LINEAR RANDOM-EFFECTS MODEL PARAMS
     parser.add_argument('--use_rfx', type = int, default = 0)
-    # use_rfx = True
 
     # NONLINEAR FLAML MODELS PARAMS
     parser.add_argument('--time_budget_mins', type = float, default = 0.1)
-    # time_budget_mins = .1
 
     # EMBEDDING PARAMS
     parser.add_argument('--embeddings_to_use', type = str, nargs = '*', default = [], choices = ['SatCLIP', 'BioCLIP'])
-    # embeddings_to_use = None # list including "SatCLIP" and/or "BioCLIP"
 
     # DUMMY REGRESSOR PARAMS
     parser.add_argument('--dummy_strat', type = str, default = 'mean', choices = ['mean', 'median'])
-    # strat = 'mean' # either "mean" or "median"
 
+    # Parse args and fix some types
     args = parser.parse_args()
 
     args.gdrive = bool(args.gdrive)
@@ -486,6 +471,5 @@ if __name__ == '__main__':
         args.embeddings_to_use = None
     args.embeddings_args = {'pca' : True, 'var_cutoff' : 0.9, 'satclip_L' : 10}
 
-    print(args)
-    print()
+    # Run the cross-val loop using the inputted params
     main(args)
