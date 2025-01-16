@@ -1,0 +1,491 @@
+import json
+import os
+import sys
+import warnings
+import argparse
+
+sys.path.append('..')
+
+import pandas as pd
+import numpy as np
+
+import matplotlib.pyplot as plt
+
+from sklearn.metrics import balanced_accuracy_score, recall_score, mean_absolute_error, root_mean_squared_error
+from sklearn.linear_model import ElasticNetCV, LogisticRegressionCV
+from sklearn.dummy import DummyRegressor
+
+from pymer4 import Lmer
+from flaml import AutoML
+
+from utils import read_csv_non_utf
+from model_utils import HurdleModelEstimator, PymerModelWrapper
+from custom_metrics import balanced_accuracy_FLAML, mean_absolute_error_range
+from cross_validation import run_cross_val, save_cv_results
+
+def read_data(args):
+    # Loading in general configuration
+    with open('../config.json', 'r') as f:
+        config = json.load(f)
+
+    # Getting filepaths
+    if args.gdrive:
+        gdrive_fp = config['gdrive_path']
+        LIFE_fp = config['LIFE_folder']
+        dataset_fp = config['datasets_path']
+        benitez_lopez2019 = config['indiv_data_paths']['benitez_lopez2019']
+        ferreiro_arias2024 = config['indiv_data_paths']['ferreiro_arias2024']
+        ferreiro_arias2024_ext = config['indiv_data_paths']['ferreiro_arias2024_extended']
+        
+        ben_lop_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019)
+        fer_ari_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024)
+        fer_ari_ext_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024_ext)
+    else:
+        ben_lop_path = config['remote_machine_paths']['benitez_lopez2019']
+        fer_ari_path = config['remote_machine_paths']['ferreiro_arias2024']
+        fer_ari_ext_path = config['remote_machine_paths']['ferreiro_arias2024_extended']
+
+    # Reading in the dataset
+    if args.dataset == 'birds':
+        data = pd.read_csv(fer_ari_path)
+    elif args.dataset == 'birds_extended':
+        data = pd.read_csv(fer_ari_ext_path)
+
+        #  bit of recoding on some categorical variables
+        data['Trophic_Niche'] = data['Trophic_Niche'].apply(lambda x: x if x in ['Frugivore', 'Invertivore', 'Omnivore'] else 'Other')
+        data['IUCN_Is_Threatened'] = data['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
+        data['Habitat_Is_Dense'] = data['Habitat_Density'].apply(lambda x: 1 if x == 'Dense' else 0)
+        
+        data = data.drop(columns = ['IUCN_Category', 'Habitat_Density'])
+    elif args.dataset == 'mammals':
+        data = read_csv_non_utf(ben_lop_path)
+    elif args.dataset == 'both':
+        ben_lop2019 = read_csv_non_utf(ben_lop_path)
+        fer_ari2024 = pd.read_csv(fer_ari_path)
+
+        cols = ['Order', 'Family', 'Species', 'ratio', 'X', 'Y', 'Country', 'BM', 'DistKm', 'PopDens', 
+                'Stunting', 'TravTime', 'LivestockBio', 'Reserve']
+        ben_lop2019 = ben_lop2019[cols]
+        ben_lop2019['Class'] = 'Mammalia'
+
+        cols = ['Order', 'Family', 'Species', 'RR', 'Latitude', 'Longitude', 'Country', 'Body_Mass', 
+                'Dist_Hunters', 'PopDens', 'Stunting', 'TravDist', 'FoodBiomass', 'Reserve']
+        fer_ari2024 = fer_ari2024[cols]
+        fer_ari2024['Class'] = 'Aves'
+        fer_ari2024['Reserve'] = fer_ari2024['Reserve'].replace({0 : 'No', 1 : 'Yes'}) # aligning the coding of this binary columns to the mammal dataset
+        
+        fer_ari2024 = fer_ari2024.rename(columns = {'RR' : 'ratio', 'Longitude' : 'X', 'Latitude' : 'Y',
+                                                    'Dist_Hunters' : 'DistKm', 'TravDist' : 'TravTime',
+                                                    'FoodBiomass' : 'LivestockBio', 'Body_Mass' : 'BM'})
+
+        data = pd.concat((ben_lop2019, fer_ari2024), join = 'inner', axis = 0, ignore_index = True)
+
+    return data
+
+def set_eval_metrics():
+    # Defining the metrics to use
+    class_metrics = {'per_class' : {'balanced_accuracy' : {'function' : balanced_accuracy_score,
+                                                           'kwargs' : {}
+                                                          },
+                                    'sensitivity' : {'function' : recall_score,
+                                                     'kwargs' : {'pos_label' : 1}
+                                                    },
+                                    'specificity' : {'function' : recall_score,
+                                                     'kwargs' : {'pos_label' : 0}
+                                                    }
+                                   },
+                     'overall' : {'balanced_accuracy_overall' : {'function' : balanced_accuracy_score,
+                                                                 'kwargs' : {}
+                                                                }
+                                 }
+                    }
+    reg_metrics = {'mean_absolute_error' : {'function' : mean_absolute_error,
+                                            'kwargs' : {}
+                                           },
+                   'root_mean_squared_error' : {'function' : root_mean_squared_error,
+                                                'kwargs' : {}
+                                               },
+                   'mean_absolute_error_0-1' : {'function' : mean_absolute_error_range,
+                                                 'kwargs' : {'lower_bound' : 0,
+                                                             'upper_bound' : 1
+                                                            }
+                                               }
+                  }
+    
+    return class_metrics, reg_metrics
+    
+def run_cross_val(args, data, class_metrics, reg_metrics):
+    # Pymer hurdle model, for sanity checking
+    if args.model_to_use == 'pymer':
+        #  setting up the equations for each model
+        if args.dataset == 'mammals':
+            formula_zero = 'local_extirpation ~ BM + DistKm + I(DistKm^2) + PopDens + Stunting + Reserve + (1|Country) + (1|Species) + (1|Study)'
+            formula_nonzero = 'RR ~ BM + DistKm + I(DistKm^2) + PopDens + I(PopDens^2) + BM*DistKm + (1|Country) + (1|Species) + (1|Study)'
+        elif args.dataset == 'birds':
+            formula_zero = 'local_extirpation ~ Body_Mass + Dist_Hunters + TravDist + PopDens + Stunting + NPP + Reserve + Body_Mass*Dist_Hunters + Body_Mass*TravDist + Body_Mass*Stunting + NPP*Dist_Hunters + (1|Country) + (1|Species)'
+            formula_nonzero = 'RR ~ Body_Mass + Dist_Hunters + TravDist + PopDens + Stunting + NPP + Reserve + Body_Mass*Dist_Hunters + Body_Mass*TravDist + Body_Mass*Stunting + NPP*Dist_Hunters + (1|Country) + (1|Species)'
+        elif args.dataset == 'both':
+            formula_zero = 'local_extirpation ~ BM + DistKm + I(DistKm^2) + TravTime + PopDens + Stunting + Reserve + BM*DistKm + BM*TravTime + BM*Stunting + (1|Country) + (1|Species)'
+            formula_nonzero = 'RR ~ BM + DistKm + I(DistKm^2) + TravTime + PopDens + I(PopDens^2) + Stunting + Reserve + BM*DistKm + BM*TravTime + BM*Stunting + (1|Country) + (1|Species)'
+
+        if args.dataset == 'both':
+            control_str = "optimizer='bobyqa', optCtrl=list(maxfun=1e6)"
+        else:
+            control_str = "optimizer='bobyqa', optCtrl=list(maxfun=1e5)"
+
+        #  hurdle model params
+        extirp_pos = False
+
+        outlier_cutoff = 15 if args.dataset == 'mammals' else 5
+        data_args = {'outlier_cutoff' : outlier_cutoff, 'dataset' : args.dataset}
+
+        #  setting up the hurdle model
+        zero_model = PymerModelWrapper(Lmer, formula = formula_zero, family = 'binomial', control_str = control_str, 
+                                       use_rfx = args.use_rfx)
+        nonzero_model = PymerModelWrapper(Lmer, formula = formula_nonzero, family = 'gaussian', control_str = control_str, 
+                                          use_rfx = args.use_rfx)
+
+        model = HurdleModelEstimator(zero_model, nonzero_model, extirp_pos = extirp_pos, data_args = data_args)
+
+        #  cross-validation params
+        back_transform = True
+        sklearn_submodels = False
+        direct = None
+        tune_hurdle_thresh = True
+        
+        fit_args = None
+        pp_args = {'include_indicators' : False,
+                   'include_categorical' : True,
+                   'polynomial_features' : 0,
+                   'log_trans_cont' : True,
+                   'dataset' : args.dataset}
+
+        #  results saving params
+        model_name = 'pymer_hurdle'
+        model_name += '_w_rfx' if args.use_rfx else '_wo_rfx'
+        
+    # Sklearn fixed-effects hurdle model
+    elif args.model_to_use == 'sklearn':
+        #  hurdle model params
+        extirp_pos = False
+        verbose = False
+        
+        if args.dataset == 'mammals':
+            zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime', 'LivestockBio', 'Literacy', 'Reserve']
+        elif args.dataset == 'birds':
+            zero_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting', 'FoodBiomass', 'Forest_cover', 'NPP', 'Body_Mass']
+        nonzero_columns = zero_columns
+        indicator_columns = []
+        
+        data_args = {'indicator_columns' : indicator_columns,
+                     'nonzero_columns' : nonzero_columns,
+                     'zero_columns' : zero_columns,
+                     'dataset' : args.dataset}
+
+        #  cross-validation params for tuning zero/nonzero model hyperparams
+        grid_cv = 5
+        logistic_penalty = 'l1'
+        l1_ratio = [0.1, 0.3, 0.5, 0.7, 0.9, 0.95, 1]
+        Cs = 20
+
+        #  setting up the hurdle model
+        nonzero_model = ElasticNetCV(cv = grid_cv, l1_ratio = l1_ratio, max_iter = 5000)
+        zero_model = LogisticRegressionCV(cv = grid_cv, Cs = Cs, penalty = logistic_penalty, solver = 'saga', max_iter = 500)
+        model = HurdleModelEstimator(zero_model, nonzero_model, extirp_pos = extirp_pos, verbose = verbose,
+                                    data_args = data_args)
+
+        #  cross-validation params
+        back_transform = True
+        sklearn_submodels = True
+        direct = None
+        tune_hurdle_thresh = True
+        
+        fit_args = None
+        pp_args = {'include_indicators' : False,
+                   'include_categorical' : False,
+                   'polynomial_features' : 2,
+                   'log_trans_cont' : False,
+                   'dataset' : args.dataset}
+        
+        #  results saving params
+        model_name = 'sklearn_hurdle'
+
+    # FLAML AutoML hurdle model
+    elif args.model_to_use == 'FLAML_hurdle':
+        #  automl params
+        base_path = os.path.join('..', 'model_saves')
+        
+        zero_metric = balanced_accuracy_FLAML
+        nonzero_metric = 'mse'
+
+        #  hurdle model params
+        verbose = 0
+        extirp_pos = False
+        
+        if args.dataset in ['mammals', 'both']:
+            zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime', 
+                            'LivestockBio', 'Reserve'] + (['Literacy'] if args.dataset == 'mammals' else [])
+        elif args.dataset == 'birds':
+            zero_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting', 'FoodBiomass', 'Forest_cover', 'NPP', 'Body_Mass']
+        elif args.dataset == 'birds_extended':
+            zero_columns = None # just using defaults here, which is all available predictors...
+        nonzero_columns = zero_columns
+        indicator_columns = []
+        
+        #  setting up the zero and nonzero models
+        zero_model = AutoML()
+        nonzero_model = AutoML()
+        
+        #  specify fitting paramaters
+        zero_settings = {
+            'time_budget' : args.time_budget_mins * 60,  # in seconds
+            'metric' : zero_metric,
+            'task' : 'classification',
+            'log_file_name' : os.path.join(base_path, f'{args.dataset}_nonlinear_hurdle_ZERO.log'),
+            'seed' : 1693,
+            'estimator_list' : ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor', 'lrl1', 'lrl2'],
+            'early_stop' : True,
+            'verbose' : verbose,
+            'keep_search_state' : True,
+            'eval_method' : 'cv'
+        }
+        
+        nonzero_settings = {
+            'time_budget' : args.time_budget_mins * 60,  # in seconds
+            'metric' : nonzero_metric,
+            'task' : 'regression',
+            'log_file_name' : os.path.join(base_path, f'{args.dataset}_nonlinear_hurdle_NONZERO.log'),
+            'seed' : 1693,
+            'estimator_list' : ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor'],
+            'early_stop' : True,
+            'verbose' : verbose,
+            'keep_search_state' : True,
+            'eval_method' : 'cv'
+        }
+        
+        #  dumping everything into the hurdle model wrapper
+        data_args = {'indicator_columns' : indicator_columns,
+                     'nonzero_columns' : nonzero_columns,
+                     'zero_columns' : zero_columns,
+                     'dataset' : args.dataset,
+                     'embeddings_to_use' : args.embeddings_to_use}
+        model = HurdleModelEstimator(zero_model, nonzero_model, extirp_pos = extirp_pos, 
+                                     data_args = data_args, verbose = False)
+
+        #  cross-validation params
+        back_transform = True
+        sklearn_submodels = False
+        direct = None
+        tune_hurdle_thresh = True
+        
+        fit_args = {'zero' : zero_settings, 'nonzero' : nonzero_settings}
+        pp_args = {'include_indicators' : False,
+                   'include_categorical' : False,
+                   'polynomial_features' : 0,
+                   'log_trans_cont' : False,
+                   'dataset' : args.dataset,
+                   'embeddings_to_use' : args.embeddings_to_use,
+                   'embeddings_args' : args.embeddings_args}
+
+        #  results saving params
+        model_name = f'FLAML_hurdle_{args.time_budget_mins}mins'
+        if args.embeddings_to_use is not None:
+            if (zero_columns is not None) and (nonzero_columns is not None):
+                if (len(zero_columns) == 0) and (len(nonzero_columns) == 0):
+                    model_name += '_JUST'
+            model_name += f'_{'+'.join(args.embeddings_to_use)}'
+
+    # FLAML AutoML direct regression model
+    elif args.model_to_use == 'FLAML_regression':
+        #  initialize automl instance
+        model = AutoML()
+        
+        #  specify paramaters
+        base_path = os.path.join('..', 'model_saves', f'direct_regression')
+        
+        automl_settings = {
+            'time_budget' : args.time_budget_mins * 60,  # in seconds
+            'metric' : 'mse',
+            'task' : 'regression',
+            'log_file_name' : os.path.join(base_path, f'{args.dataset}_direct_regression.log'),
+            'seed' : 1693,
+            'estimator_list' : ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor'],
+            'early_stop' : True,
+            'verbose' : 0,
+            'eval_method' : 'cv'
+        }
+
+        #  cross-validation params
+        back_transform = False
+        sklearn_submodels = False
+        direct = 'regression'
+        tune_hurdle_thresh = False
+
+        fit_args = automl_settings
+        pp_args = {'include_indicators' : False,
+                   'include_categorical' : False,
+                   'polynomial_features' : 0,
+                   'log_trans_cont' : False,
+                   'dataset' : args.dataset}
+
+        #  results saving params
+        model_name = f'FLAML_regression_{args.time_budget_mins}mins'
+
+    # FLAML AutoML direct classification model
+    elif args.model_to_use == 'FLAML_classification':
+        #  initialize the automl instance
+        model = AutoML()
+        
+        #  specify paramaters
+        base_path = os.path.join('..', 'model_saves', f'direct_classification')
+        
+        automl_settings = {
+            'time_budget' : args.time_budget_mins * 60,  # in seconds
+            'metric' : balanced_accuracy_FLAML,
+            'task' : 'classification',
+            'log_file_name' : os.path.join(base_path, f'{args.dataset}_direct_classification.log'),
+            'seed' : 1693,
+            'estimator_list' : ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor'],
+            'early_stop' : True,
+            'verbose' : 0,
+            'eval_method' : 'cv'
+        }
+
+        #  cross-validation params
+        back_transform = False
+        sklearn_submodels = False
+        direct = 'classification'
+        tune_hurdle_thresh = False
+        reg_metrics = None
+
+        fit_args = automl_settings
+        pp_args = {'include_indicators' : False,
+                'include_categorical' : False,
+                'polynomial_features' : 0,
+                'log_trans_cont' : False,
+                'dataset' : args.dataset}
+
+        #  results saving params
+        model_name = f'FLAML_classification_{args.time_budget_mins}mins'
+
+    # Dummy regressor
+    elif args.model_to_use == 'dummy_regressor':
+        model = DummyRegressor(strategy = args.dummy_strat)
+        
+        #  cross-validation params
+        back_transform = False
+        sklearn_submodels = False
+        direct = 'regression'
+        tune_hurdle_thresh = False
+
+        fit_args = None
+        pp_args = {'include_indicators' : False,
+                   'include_categorical' : False,
+                   'polynomial_features' : 0,
+                   'log_trans_cont' : False,
+                   'dataset' : args.dataset}
+
+        #  results saving params
+        model_name = 'dummy_regressor'
+
+    print(f'Training/testing on {args.dataset} dataset{'s' if args.dataset == 'both' else ''}\n')
+
+    print(f'Using {model_name}\n')
+
+    if args.dataset != 'both':
+        all_metric_names = list(class_metrics['per_class']) + list(class_metrics['overall']) + (list(reg_metrics.keys()) if reg_metrics is not None else [])
+        print(f'Metrics: {all_metric_names}\n')
+
+    sys.exit()
+
+    # Run the cross-validation using the inputted params
+    metrics_dict = run_cross_val(model, data, block_type = args.block_type, num_folds = args.num_folds, 
+                                 group_col = args.group_col, spatial_spacing = args.spatial_spacing, fit_args = fit_args, 
+                                 pp_args = pp_args, class_metrics = class_metrics, reg_metrics = reg_metrics, 
+                                 verbose = True, random_state = 1693, sklearn_submodels = sklearn_submodels, 
+                                 back_transform = back_transform, direct = direct, tune_hurdle_thresh = tune_hurdle_thresh)
+    
+    return metrics_dict, model_name
+    
+def save_results(args, metrics_dict, model_name, class_metrics, reg_metrics):
+    # Saving and displaying results
+    cross_val_params = {'num_folds' : args.num_folds,
+                        'block_type' : args.block_type,
+                        'spatial_spacing' : args.spatial_spacing,
+                        'group_col' : args.group_col}
+
+    save_cv_results(metrics_dict, model_name, args.save_fp, cross_val_params, class_metrics, reg_metrics, args.vals_to_save, args.dataset)
+    print(f'Saved results at {args.save_fp}')
+
+def main(args):
+    # Get the dataset
+    data = read_data(args)
+
+    # Get evaluation metrics
+    class_metrics, reg_metrics = set_eval_metrics()
+
+    # Run the cross validation with the chosen parameters, metrics, and dataset
+    metrics_dict, model_name = run_cross_val(args, data, class_metrics, reg_metrics)
+
+    # Save the result of the cross validation
+    save_cv_results(args, metrics_dict, model_name, class_metrics, reg_metrics)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    # DATASET PARAMS
+    parser.add_argument('--gdrive', type = int, default = 1)
+    # gdrive = True
+
+    parser.add_argument('--dataset', type = str, default = 'birds', choices = ['mammals', 'birds', 'birds_extended', 'both'])
+    # dataset = 'birds_extended' # "mammals", "birds", "birds_extended", or "both"
+
+    # MODEL PARAMS
+    parser.add_argument('--model_to_use', type = str, default = 'FLAML_hurdle', choices = ['pymer', 'sklearn', 'FLAML_hurdle', 'FLAML_regression', 'FLAML_classification'])
+    # model_to_use = 'FLAML_hurdle' # "pymer", "sklearn", "FLAML_hurdle", "FLAML_regression", "FLAML_classification"
+    
+    parser.add_argument('--vals_to_save', type = str, nargs = '*', default = ['metrics'], choices = ['metrics', 'raw'])
+    # vals_to_save = ['metrics', 'raw']
+
+    # CROSS-VALIDATION PARAMS
+    
+    parser.add_argument('--num_folds', type = int, default = 5)
+    # num_folds = 5
+    
+    parser.add_argument('--block_type', type = str, default = 'random', choices = ['random', 'group', 'spatial'])
+    # block_type = None
+    
+    parser.add_argument('--group_col', type = str, default = 'species', choices = ['species'])
+    # group_col = 'species'
+    
+    parser.add_argument('--spatial_spacing', type = int, default = 5)
+    # spatial_spacing = 5
+
+    # LINEAR RANDOM-EFFECTS MODEL PARAMS
+    parser.add_argument('--use_rfx', type = int, default = 0)
+    # use_rfx = True
+
+    # NONLINEAR FLAML MODELS PARAMS
+    parser.add_argument('--time_budget_mins', type = float, default = 0.1)
+    # time_budget_mins = .1
+
+    # EMBEDDING PARAMS
+    parser.add_argument('--embeddings_to_use', type = str, nargs = '*', default = [], choices = ['SatCLIP', 'BioCLIP'])
+    # embeddings_to_use = None # list including "SatCLIP" and/or "BioCLIP"
+
+    # DUMMY REGRESSOR PARAMS
+    parser.add_argument('--dummy_strat', type = str, default = 'mean', choices = ['mean', 'median'])
+    # strat = 'mean' # either "mean" or "median"
+
+    args = parser.parse_args()
+
+    args.gdrive = bool(args.gdrive)
+    args.use_rfx = bool(args.use_rfx)
+
+    if args.embeddings_to_use == []:
+        args.embeddings_to_use = None
+    args.embeddings_args = {'pca' : True, 'var_cutoff' : 0.9, 'satclip_L' : 10}
+
+    print(args)
+    print()
+    main(args)

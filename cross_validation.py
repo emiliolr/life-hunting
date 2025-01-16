@@ -86,7 +86,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
         pp_args = {}
 
     # Establishing k-fold parameters
-    if block_type is None:
+    if block_type == 'random':
         if verbose:
             print('Using standard cross-validation')
         groups = None
