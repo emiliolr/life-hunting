@@ -1,9 +1,9 @@
-name: life-hunting
+name: life-hunting-TEST
 channels:
-  - defaults
   - conda-forge
+  - defaults
 dependencies:
-  - python=3.12
+  - python=3.12.2
   - jupyterlab[version='>=3']
   - ca-certificates
   - openssl
@@ -26,4 +26,6 @@ dependencies:
   - flaml
   - imbalanced-learn
   - verde
-prefix: /Users/emiliolr/miniforge3/envs/life-hunting
+  - libsqlite=3.45.2
+  - sqlite=3.41.2
+prefix: /maps/el590/miniforge3/envs/life-hunting-TEST

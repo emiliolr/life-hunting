@@ -13,8 +13,7 @@ import open_clip
 import torch
 from huggingface_hub import hf_hub_download
 
-this_file = '/Users/emiliolr/Desktop/life-hunting/species_embeddings.py'
-dir_to_add = os.path.dirname(os.path.relpath(this_file))
+dir_to_add = os.path.dirname(os.path.relpath(__file__))
 sys.path.append(os.path.join(dir_to_add, 'satclip'))
 sys.path.append(os.path.join(dir_to_add, 'satclip', 'satclip'))
 
