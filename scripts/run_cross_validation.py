@@ -44,7 +44,7 @@ def read_data(args):
         ben_lop_path = config['remote_machine_paths']['benitez_lopez2019']
         fer_ari_path = config['remote_machine_paths']['ferreiro_arias2024']
         fer_ari_ext_path = config['remote_machine_paths']['ferreiro_arias2024_extended']
-        
+
     # Reading in the dataset
     if args.dataset == 'birds':
         data = pd.read_csv(fer_ari_path)
@@ -388,6 +388,11 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         #  results saving params
         model_name = 'dummy_regressor'
 
+    # Making sure the save directory exists for autoML training
+    if args.model_to_use.startswith('FLAML'):
+        if not os.path.exists(base_path):
+            os.mkdir(base_path)
+
     print(f'Training/testing on {args.dataset} dataset{'s' if args.dataset == 'both' else ''}\n')
 
     print(f'Using {model_name}\n')
@@ -411,6 +416,11 @@ def save_results(args, metrics_dict, model_name, class_metrics, reg_metrics):
                         'block_type' : args.block_type,
                         'spatial_spacing' : args.spatial_spacing,
                         'group_col' : args.group_col}
+
+    #  making sure the save directory structure is set up correctly
+    if not os.path.exists(args.save_fp):
+        os.mkdir(args.save_fp)
+        os.mkdir(os.path.join(args.save_fp, 'raw_predictions'))
 
     save_cv_results(metrics_dict, model_name, args.save_fp, cross_val_params, class_metrics, reg_metrics,
                     args.vals_to_save, args.dataset)
