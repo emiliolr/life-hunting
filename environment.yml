@@ -23,7 +23,8 @@ dependencies:
   - lightning
   - torchgeo
   - albumentations
-  - flaml
+  - flaml=2.1.2
+  - xgboost=2.0.3
   - imbalanced-learn
   - verde
   - libsqlite=3.45.2
