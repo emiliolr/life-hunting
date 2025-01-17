@@ -1,4 +1,4 @@
-name: life-hunting-TEST
+name: life-hunting
 channels:
   - conda-forge
   - defaults
@@ -29,4 +29,4 @@ dependencies:
   - verde
   - libsqlite=3.45.2
   - sqlite=3.41.2
-prefix: /maps/el590/miniforge3/envs/life-hunting-TEST
+prefix: /maps/el590/miniforge3/envs/life-hunting
