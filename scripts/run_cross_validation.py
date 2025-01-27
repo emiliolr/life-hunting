@@ -447,7 +447,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type = str, default = 'birds', choices = ['mammals', 'birds', 'birds_extended', 'both'])
 
     # MODEL PARAMS
-    parser.add_argument('--model_to_use', type = str, default = 'FLAML_hurdle', choices = ['pymer', 'sklearn', 'FLAML_hurdle', 'FLAML_regression', 'FLAML_classification'])
+    parser.add_argument('--model_to_use', type = str, default = 'FLAML_hurdle', choices = ['pymer', 'sklearn', 'FLAML_hurdle', 'FLAML_regression', 'FLAML_classification', 'dummy_regressor'])
     parser.add_argument('--vals_to_save', type = str, nargs = '*', default = ['metrics'], choices = ['metrics', 'raw'])
 
     # CROSS-VALIDATION PARAMS
@@ -473,6 +473,9 @@ if __name__ == '__main__':
 
     # Parse args and fix some types
     args = parser.parse_args()
+
+    if (args.group_col == 'species') and (args.dataset.startswith('birds')):
+        args.group_col = 'Species'
 
     args.gdrive = bool(args.gdrive)
     args.use_rfx = bool(args.use_rfx)

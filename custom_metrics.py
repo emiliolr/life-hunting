@@ -3,6 +3,7 @@ import time
 import numpy as np
 
 from sklearn.metrics import recall_score, balanced_accuracy_score, mean_absolute_error
+from scipy.stats import ks_2samp, wasserstein_distance
 
 def mean_absolute_error_range(y_true, y_pred, lower_bound = 0, upper_bound = 1):
 
@@ -169,11 +170,11 @@ def get_DI_cats(ratios, neighborhood = 0, numeric = False):
 
     return DI_cat
 
-def balanced_accuracy_DI_cats(y_true, y_pred, neigborhood = 0.05):
+def balanced_accuracy_DI_cats(y_true, y_pred, neighborhood = 0.05):
 
     # Turning continuous RRs into DI categories
-    y_true_cats = get_DI_cats(y_true, neighborhood = neigborhood, numeric = True)
-    y_pred_cats = get_DI_cats(y_pred, neighborhood = neigborhood, numeric = True)
+    y_true_cats = get_DI_cats(y_true, neighborhood = neighborhood, numeric = True)
+    y_pred_cats = get_DI_cats(y_pred, neighborhood = neighborhood, numeric = True)
 
     # Calculating balanced accuracy on these categories
     ba = balanced_accuracy_score(y_true_cats, y_pred_cats)

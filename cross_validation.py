@@ -193,7 +193,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
                 y_pred[y_pred != 0] = np.exp(y_pred[y_pred != 0])
         else:
             assert direct in ['classification', 'regression'], 'The "direct" argument must either be "classification" or "regression."'
-            assert pp_data['dataset'] != 'both', 'Training/testing on both datasets is only supported for hurdle models.'
+            assert pp_args['dataset'] != 'both', 'Training/testing on both datasets is only supported for hurdle models.'
 
             #  getting the data split
             X_train, y_train, X_test, y_test = direct_train_test(pp_data, task = direct, already_pp = True,
