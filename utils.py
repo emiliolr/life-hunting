@@ -406,8 +406,27 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
                             'FoodBiomass', 'Forest_Cover', 'NPP', 'Range_Size', 'Body_Mass', 
                             'Reserve', 'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Pet_Trade', 
                             'IUCN_Is_Threatened', 'Habitat_Is_Dense']
+    elif dataset == 'mammals_extended':
+        if indicator_columns is None:
+            indicator_columns = []
+        if nonzero_columns is None:
+            nonzero_columns = ['Diet', 'Body_Mass', 'Year', 'Dist_Access_Pts', 'Travel_Time', 
+                               'Livestock_Biomass', 'Stunting', 'Population_Density', 'Literacy', 
+                               'Forest_Cover', 'NPP', 'Reserve', 'Activity_Nocturnal', 
+                               'Activity_Crepuscular', 'Activity_Diurnal', 'IUCN_Is_Hunted',
+                               'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 'IUCN_For_Medicine', 
+                               'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 'IUCN_For_Wearing_Apparel', 
+                               'IUCN_Is_Threatened']
+        if zero_columns is None:
+            zero_columns = ['Diet', 'Body_Mass', 'Year', 'Dist_Access_Pts', 'Travel_Time', 
+                            'Livestock_Biomass', 'Stunting', 'Population_Density', 'Literacy', 
+                            'Forest_Cover', 'NPP', 'Reserve', 'Activity_Nocturnal', 
+                            'Activity_Crepuscular', 'Activity_Diurnal', 'IUCN_Is_Hunted',
+                            'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 'IUCN_For_Medicine', 
+                            'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 'IUCN_For_Wearing_Apparel', 
+                            'IUCN_Is_Threatened']
     else:
-        raise ValueError('The only supported datasets are "mammals," "birds," "both", or "birds_extended".')
+        raise ValueError('The only supported datasets are "mammals," "birds," "both", "birds_extended", or "mammals_extended".')
 
     if embeddings_to_use is None:
         embeddings_to_use = []
@@ -432,6 +451,9 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     # Extracting the inputs/outputs for each of the models in the case where we have labels
     if not pred:
         resp_col = 'ratio' if dataset in ['mammals', 'both'] else 'RR'
+        if dataset == 'mammals_extended':
+            resp_col = 'Ratio'
+
         ratio = pp_data[resp_col].values
         nonzero_mask = (ratio != 0)
         outlier_mask = ratio < outlier_cutoff # only keeping values smaller than cutoff - ratio is always positive!
@@ -514,8 +536,17 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         special_columns = ['Reserve', 'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Pet_Trade', 
                            'IUCN_Is_Threatened', 'Habitat_Is_Dense']
         response_column = 'RR'
+    elif dataset == 'mammals_extended':
+        indicator_columns = ['Diet']
+        continuous_columns = ['Body_Mass', 'Dist_Access_Pts', 'Travel_Time', 'Livestock_Biomass', 
+                              'Stunting', 'Population_Density', 'Literacy', 'Forest_Cover', 'NPP']
+        special_columns = ['Year', 'Reserve', 'Activity_Nocturnal', 'Activity_Crepuscular', 'Activity_Diurnal', 
+                           'IUCN_Is_Hunted','IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 
+                           'IUCN_For_Medicine', 'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 
+                           'IUCN_For_Wearing_Apparel', 'IUCN_Is_Threatened']
+        response_column = 'Ratio'
     else:
-        raise ValueError('The only supported datasets are "mammals," "birds," "both", or "birds_extended".')
+        raise ValueError('The only supported datasets are "mammals," "birds," "both", "birds_extended", or "mammals_extended".')
 
     # Grabbing just the continuous predictors
     pp_data = data[continuous_columns].copy(deep = True)
@@ -551,10 +582,10 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         pp_data = pp_data.sort_index()
 
     # Turning reserve into an indicator variable - not needed for bird dataset!
-    if dataset in ['mammals', 'both'] and 'Reserve' in special_columns:
+    if dataset in ['mammals', 'both', 'mammals_extended'] and 'Reserve' in special_columns:
         pp_data['Reserve'] = (data['Reserve'] == 'Yes').astype(int)
 
-    # Adding other special columns
+    # Adding other special columns as is
     for col in special_columns:
         if col not in pp_data.columns:
             pp_data[col] = data[col].copy(deep = True)
@@ -730,27 +761,29 @@ if __name__ == '__main__':
     gdrive_fp = config['gdrive_path']
     LIFE_fp = config['LIFE_folder']
     dataset_fp = config['datasets_path']
-    ferreiro_arias2024_ext = config['indiv_data_paths']['ferreiro_arias2024_extended']
+    benitez_lopez2019_ext = config['indiv_data_paths']['benitez_lopez2019_extended']
     
-    fer_ari_ext_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024_ext)
+    ben_lop_ext_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019_ext)
+    data = pd.read_csv(ben_lop_ext_path)
 
-    data = pd.read_csv(fer_ari_ext_path)
-
-    data['Trophic_Niche'] = data['Trophic_Niche'].apply(lambda x: x if x in ['Frugivore', 'Invertivore', 'Omnivore'] else 'Other')
     data['IUCN_Is_Threatened'] = data['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
-    data['Habitat_Is_Dense'] = data['Habitat_Density'].apply(lambda x: 1 if x == 'Dense' else 0)
-    
-    data = data.drop(columns = ['IUCN_Category', 'Habitat_Density'])
+    data = data.drop(columns = ['IUCN_Category', 'Generation_Time'])
 
     pp_data = preprocess_data(data, include_indicators = True, include_categorical = False,
                               standardize = True, log_trans_cont = False, polynomial_features = 0,
                               embeddings_to_use = None, embeddings_args = None, train_test_idxs = None,
-                              dataset = 'birds_extended')
+                              dataset = 'mammals_extended')
     
     X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, outlier_cutoff = np.Inf, extirp_pos = False,
                                                                      zero_columns = None, nonzero_columns = None, indicator_columns = None,
-                                                                     embeddings_to_use = None, dataset = 'birds_extended')
+                                                                     embeddings_to_use = None, dataset = 'mammals_extended')
 
     print(X_zero.columns)
     print('\n\n\n')
     print(X_nonzero.columns)
+
+    print()
+
+    print(X_zero)
+    print('\n\n\n')
+    print(X_nonzero)

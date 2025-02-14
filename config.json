@@ -6,6 +6,7 @@
     "benitez_lopez2019" : "hunting_pressure_response/benitez_lopez2019/huntmamdata.csv",
     "ferreiro_arias2024" : "hunting_pressure_response/ferreiro_arias2024/Bird_RR_data.csv",
     "ferreiro_arias2024_extended" : "derived_datasets/ferreiro_arias2024_extended/ferreiro_arias2024_extended.csv",
+    "benitez_lopez2019_extended" : "derived_datasets/benitez_lopez2019_extended/benitez_lopez2019_extended_FINAL.csv",
     "human_pop_density" : {
       "base_path" : "socioeconomic_predictors/human_population_density",
       "data_path" : "gpw-v4-population-density-rev11_{}_30_sec_tif/gpw_v4_population_density_rev11_{}_30_sec.tif",
@@ -25,6 +26,7 @@
   "remote_machine_paths" : {
       "benitez_lopez2019" : "/maps/el590/hunting_pressure_response/benitez_lopez2019/huntmamdata.csv",
       "ferreiro_arias2024" : "/maps/el590/hunting_pressure_response/ferreiro_arias2024/Bird_RR_data.csv",
-      "ferreiro_arias2024_extended" : "/maps/el590/ferreiro_arias2024_extended/ferreiro_arias2024_extended.csv"
+      "ferreiro_arias2024_extended" : "/maps/el590/ferreiro_arias2024_extended/ferreiro_arias2024_extended.csv",
+      "benitez_lopez2019_extended" : "/maps/el590/benitez_lopez2019_extended_FINAL.csv"
     }
 }

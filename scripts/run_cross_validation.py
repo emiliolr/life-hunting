@@ -33,17 +33,22 @@ def read_data(args):
         gdrive_fp = config['gdrive_path']
         LIFE_fp = config['LIFE_folder']
         dataset_fp = config['datasets_path']
+
         benitez_lopez2019 = config['indiv_data_paths']['benitez_lopez2019']
         ferreiro_arias2024 = config['indiv_data_paths']['ferreiro_arias2024']
+
         ferreiro_arias2024_ext = config['indiv_data_paths']['ferreiro_arias2024_extended']
+        benitez_lopez2019_ext = config['indiv_data_paths']['benitez_lopez2019_extended']
         
         ben_lop_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019)
         fer_ari_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024)
         fer_ari_ext_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024_ext)
+        ben_lop_ext_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019_ext)
     else:
         ben_lop_path = config['remote_machine_paths']['benitez_lopez2019']
         fer_ari_path = config['remote_machine_paths']['ferreiro_arias2024']
         fer_ari_ext_path = config['remote_machine_paths']['ferreiro_arias2024_extended']
+        ben_lop_ext_path = config['remote_machine_paths']['benitez_lopez2019_extended']
 
     # Reading in the dataset
     if args.dataset == 'birds':
@@ -59,6 +64,13 @@ def read_data(args):
         data = data.drop(columns = ['IUCN_Category', 'Habitat_Density'])
     elif args.dataset == 'mammals':
         data = read_csv_non_utf(ben_lop_path)
+    elif args.dataset == 'mammals_extended':
+        data = pd.read_csv(ben_lop_ext_path)
+
+        #  recoding IUCN category to make it a numeric indicator
+        data['IUCN_Is_Threatened'] = data['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
+
+        data = data.drop(columns = ['IUCN_Category', 'Generation_Time'])
     elif args.dataset == 'both':
         ben_lop2019 = read_csv_non_utf(ben_lop_path)
         fer_ari2024 = pd.read_csv(fer_ari_path)
@@ -227,7 +239,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                             'LivestockBio', 'Reserve'] + (['Literacy'] if args.dataset == 'mammals' else [])
         elif args.dataset == 'birds':
             zero_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting', 'FoodBiomass', 'Forest_cover', 'NPP', 'Body_Mass']
-        elif args.dataset == 'birds_extended':
+        elif args.dataset in ['birds_extended', 'mammals_extended']:
             zero_columns = None # just using defaults here, which is all available predictors...
         nonzero_columns = zero_columns
         indicator_columns = []
@@ -444,7 +456,7 @@ if __name__ == '__main__':
 
     # DATASET PARAMS
     parser.add_argument('--gdrive', type = int, default = 1)
-    parser.add_argument('--dataset', type = str, default = 'birds', choices = ['mammals', 'birds', 'birds_extended', 'both'])
+    parser.add_argument('--dataset', type = str, default = 'birds', choices = ['mammals', 'birds', 'birds_extended', 'mammals_extended', 'both'])
 
     # MODEL PARAMS
     parser.add_argument('--model_to_use', type = str, default = 'FLAML_hurdle', choices = ['pymer', 'sklearn', 'FLAML_hurdle', 'FLAML_regression', 'FLAML_classification', 'dummy_regressor'])
