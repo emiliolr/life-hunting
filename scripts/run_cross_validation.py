@@ -70,7 +70,7 @@ def read_data(args):
         #  recoding IUCN category to make it a numeric indicator
         data['IUCN_Is_Threatened'] = data['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
 
-        data = data.drop(columns = ['IUCN_Category', 'Generation_Time'])
+        data = data.drop(columns = ['IUCN_Category', 'Generation_Time']) # getting rid of generation time, too many missing values
     elif args.dataset == 'both':
         ben_lop2019 = read_csv_non_utf(ben_lop_path)
         fer_ari2024 = pd.read_csv(fer_ari_path)
@@ -139,6 +139,8 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         elif args.dataset == 'both':
             formula_zero = 'local_extirpation ~ BM + DistKm + I(DistKm^2) + TravTime + PopDens + Stunting + Reserve + BM*DistKm + BM*TravTime + BM*Stunting + (1|Country) + (1|Species)'
             formula_nonzero = 'RR ~ BM + DistKm + I(DistKm^2) + TravTime + PopDens + I(PopDens^2) + Stunting + Reserve + BM*DistKm + BM*TravTime + BM*Stunting + (1|Country) + (1|Species)'
+        else:
+            raise ValueError('Dataset {args.dataset} not implemented for pymer hurdle model')
 
         if args.dataset == 'both':
             control_str = "optimizer='bobyqa', optCtrl=list(maxfun=1e6)"
@@ -486,7 +488,7 @@ if __name__ == '__main__':
     # Parse args and fix some types
     args = parser.parse_args()
 
-    if (args.group_col == 'species') and (args.dataset.startswith('birds')):
+    if (args.group_col == 'species') and (args.dataset.startswith('birds') or (args.dataset == 'mammals_extended')):
         args.group_col = 'Species'
 
     args.gdrive = bool(args.gdrive)

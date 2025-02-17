@@ -1,1 +1,1 @@
-python run_cross_validation.py --gdrive 1 --dataset birds --model_to_use pymer --vals_to_save metrics raw --num_folds 5 --block_type random --use_rfx 1
+python run_cross_validation.py --gdrive 1 --dataset birds --model_to_use pymer --vals_to_save metrics raw --num_folds 5 --block_type random --use_rfx 0

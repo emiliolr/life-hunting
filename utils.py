@@ -255,7 +255,7 @@ def test_thresholds(y_pred, y_true, precision = 0.05):
 
     metrics = []
 
-    thresholds = np.arange(0, 1, precision) # tresholds to test
+    thresholds = np.arange(0, 1, precision) # thresholds to test
     for thresh in thresholds:
         thresh = round(thresh, 4) # fixing weird precision thing with arange...
         y_hard = (y_pred >= thresh).astype(int) # values greater than the threshold are considered positive hard classifications
@@ -706,7 +706,7 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
     train_size : float
         the portion of data to assign to the train set
     task : string
-        either 'classification' or 'regression'
+        one of 'classification', 'regression', or 'joint'
     already_pp : boolean
         is the data already preprocessed?
     train_test_idxs : dictionary
@@ -740,15 +740,26 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
 
     resp_col = 'ratio' if dataset == 'mammals' else 'RR'
     pp_data['DI_cat'] = ratios_to_DI_cats(pp_data[resp_col])
+    pp_data['Local_Extirpation'] = (pp_data[resp_col] == 0).astype(int)
 
     # Splitting the dataset into train/test sets
     train_data, test_data = pp_data.iloc[train_test_idxs['train']], pp_data.iloc[train_test_idxs['test']]
 
     # Putting into the format that FLAML wants
-    target_col = resp_col if task == 'regression' else 'DI_cat'
+    if task == 'regression':
+        target_col = resp_col
+    elif task == 'classification':
+        target_col = 'DI_cat'
+    elif task == 'joint':
+        target_col = [resp_col, 'Local_Extirpation']
 
-    X_train, X_test = train_data.drop(columns = [resp_col, 'DI_cat']), test_data.drop(columns = [resp_col, 'DI_cat'])
-    y_train, y_test = train_data[target_col].values, test_data[target_col].values
+    drop_cols = [resp_col, 'DI_cat', 'Local_Extirpation']
+
+    X_train, X_test = train_data.drop(columns = drop_cols), test_data.drop(columns = drop_cols)
+    if task != 'joint':
+        y_train, y_test = train_data[target_col].values, test_data[target_col].values
+    else:
+        y_train, y_test = train_data[target_col], test_data[target_col]
 
     return X_train, y_train, X_test, y_test
 

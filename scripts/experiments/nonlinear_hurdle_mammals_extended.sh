@@ -1,0 +1,1 @@
+python run_cross_validation.py --gdrive 1 --dataset mammals_extended --model_to_use FLAML_hurdle --vals_to_save metrics raw --num_folds 5 --block_type group --group_col species --time_budget_mins 2

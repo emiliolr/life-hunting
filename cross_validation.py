@@ -186,6 +186,9 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
             y_pred = model.predict(test_data)
 
             resp_col = 'ratio' if pp_args['dataset'] in ['mammals', 'both'] else 'RR'
+            if pp_args['dataset'] == 'mammals_extended':
+                resp_col = 'Ratio'
+
             y_test = test_data[resp_col].copy(deep = True)
 
             #  back-transforming to go from RRs --> ratios
