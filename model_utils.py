@@ -64,14 +64,15 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
     """
 
     def __init__(self, zero_model, nonzero_model, prob_thresh = 0.5, extirp_pos = True,
-                 verbose = False, data_args = {}):
+                 verbose = False, data_args = None):
+        self.data_args = {} if data_args is None else data_args
+        
         self.zero_model = zero_model
         self.nonzero_model = nonzero_model
 
         self.prob_thresh = prob_thresh
         self.extirp_pos = extirp_pos
         self.verbose = verbose
-        self.data_args = data_args
 
     def fit(self, pp_data, fit_args = None):
         if fit_args is None:

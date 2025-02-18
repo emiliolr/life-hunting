@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.metrics import balanced_accuracy_score, recall_score, mean_absolute_error, root_mean_squared_error
-from sklearn.linear_model import ElasticNetCV, LogisticRegressionCV
+from sklearn.linear_model import ElasticNetCV, LogisticRegressionCV, LinearRegression, LogisticRegression
 from sklearn.dummy import DummyRegressor
 
 from pymer4 import Lmer
@@ -276,13 +276,19 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
             'keep_search_state' : True,
             'eval_method' : 'cv'
         }
+
+        #  optionally, adding ability to ensemble via stacked generalization
+        if args.ensemble:
+            zero_settings['ensemble'] = {'passthrough' : False, 'final_estimator' : LogisticRegression()}
+            nonzero_settings['ensemble'] = {'passthrough' : False, 'final_estimator' : LinearRegression()}
         
         #  dumping everything into the hurdle model wrapper
         data_args = {'indicator_columns' : indicator_columns,
                      'nonzero_columns' : nonzero_columns,
                      'zero_columns' : zero_columns,
                      'dataset' : args.dataset,
-                     'embeddings_to_use' : args.embeddings_to_use}
+                     'embeddings_to_use' : args.embeddings_to_use,
+                     'rebalance_dataset' : args.rebalance_dataset}
         model = HurdleModelEstimator(zero_model, nonzero_model, extirp_pos = extirp_pos, 
                                      data_args = data_args, verbose = False)
 
@@ -459,6 +465,7 @@ if __name__ == '__main__':
     # DATASET PARAMS
     parser.add_argument('--gdrive', type = int, default = 1)
     parser.add_argument('--dataset', type = str, default = 'birds', choices = ['mammals', 'birds', 'birds_extended', 'mammals_extended', 'both'])
+    parser.add_argument('--rebalance_dataset', type = int, default = 0)
 
     # MODEL PARAMS
     parser.add_argument('--model_to_use', type = str, default = 'FLAML_hurdle', choices = ['pymer', 'sklearn', 'FLAML_hurdle', 'FLAML_regression', 'FLAML_classification', 'dummy_regressor'])
@@ -478,6 +485,7 @@ if __name__ == '__main__':
 
     # NONLINEAR FLAML MODELS PARAMS
     parser.add_argument('--time_budget_mins', type = float, default = 0.1)
+    parser.add_argument('--ensemble', type = int, default = 0)
 
     # EMBEDDING PARAMS
     parser.add_argument('--embeddings_to_use', type = str, nargs = '*', default = [], choices = ['SatCLIP', 'BioCLIP'])
@@ -493,6 +501,8 @@ if __name__ == '__main__':
 
     args.gdrive = bool(args.gdrive)
     args.use_rfx = bool(args.use_rfx)
+    args.ensemble = bool(args.ensemble)
+    args.rebalance_dataset = bool(args.rebalance_dataset)
 
     if args.embeddings_to_use == []:
         args.embeddings_to_use = None

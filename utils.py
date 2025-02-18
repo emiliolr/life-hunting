@@ -9,6 +9,7 @@ import torch
 from pytaxize import Ids, itis
 
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+from imblearn.over_sampling import SMOTENC
 
 from custom_metrics import true_skill_statistic
 import embeddings
@@ -325,7 +326,7 @@ def count_parameters(model):
 
 def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, extirp_pos = True,
                               zero_columns = None, nonzero_columns = None, indicator_columns = None,
-                              embeddings_to_use = None, dataset = 'mammals'):
+                              embeddings_to_use = None, dataset = 'mammals', rebalance_dataset = False):
 
     """
     A helper function to split out the datasets for the binary (zero) and continuous
@@ -355,6 +356,9 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     dataset : string
         the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019),
         'birds' (Ferreiro-Arias et al., 2024), 'both', or 'birds_extended'
+    rebalance_dataset : boolean
+        should we oversample the minority class for the local extirpation model using
+        the SMOTE algorithm?
 
     Returns
     -------
@@ -464,6 +468,12 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         y_zero = (ratio == 0).astype(int) if extirp_pos else (ratio != 0).astype(int)
         y_zero = y_zero[outlier_mask]
         y_nonzero = np.log(ratio[nonzero_mask & outlier_mask].copy())
+
+        if rebalance_dataset:
+            assert dataset == 'mammals', 'Oversampling of minority class only supported for mammal dataset currently'
+
+            smote = SMOTENC(categorical_features = ['Reserve'], random_state = 1693)
+            X_zero, y_zero = smote.fit_resample(X_zero, y_zero)
 
         return X_zero, y_zero, X_nonzero, y_nonzero
 
@@ -772,22 +782,19 @@ if __name__ == '__main__':
     gdrive_fp = config['gdrive_path']
     LIFE_fp = config['LIFE_folder']
     dataset_fp = config['datasets_path']
-    benitez_lopez2019_ext = config['indiv_data_paths']['benitez_lopez2019_extended']
+    benitez_lopez2019 = config['indiv_data_paths']['benitez_lopez2019']
     
-    ben_lop_ext_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019_ext)
-    data = pd.read_csv(ben_lop_ext_path)
+    ben_lop_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019)
+    data = read_csv_non_utf(ben_lop_path)
 
-    data['IUCN_Is_Threatened'] = data['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
-    data = data.drop(columns = ['IUCN_Category', 'Generation_Time'])
-
-    pp_data = preprocess_data(data, include_indicators = True, include_categorical = False,
+    pp_data = preprocess_data(data, include_indicators = False, include_categorical = False,
                               standardize = True, log_trans_cont = False, polynomial_features = 0,
                               embeddings_to_use = None, embeddings_args = None, train_test_idxs = None,
-                              dataset = 'mammals_extended')
+                              dataset = 'mammals')
     
     X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, outlier_cutoff = np.Inf, extirp_pos = False,
                                                                      zero_columns = None, nonzero_columns = None, indicator_columns = None,
-                                                                     embeddings_to_use = None, dataset = 'mammals_extended')
+                                                                     embeddings_to_use = None, dataset = 'mammals', rebalance_dataset = True)
 
     print(X_zero.columns)
     print('\n\n\n')
