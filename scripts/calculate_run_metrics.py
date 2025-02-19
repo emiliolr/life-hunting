@@ -79,8 +79,7 @@ def get_metric_CV(raw_preds, metric, submodel = None, **kwargs):
     """
 
     if submodel == 'nonzero':
-        raw_preds = raw_preds[raw_preds['actual'] != 0].copy(deep = True) # tossing zero entries
-        return raw_preds
+        raw_preds = raw_preds[raw_preds['actual'] != 0].copy(deep = True) # tossing zero entries when just evaluating the nonzero model
     raw_preds = raw_preds.groupby('fold')
 
     if submodel is None:
@@ -203,9 +202,7 @@ def main(args):
 
     # Applying the metrics to the raw predictions, only applying hurdle-specific metrics to hurdle models
     for r in runs_to_eval:
-        print(r['model_name'])
         for m in metrics:
-            print(m['name'])
             submodel = None
             if m['valid'] == 'hurdle':
                 if ('hurdle' in r['model_name']) and ('predicted_zero' in r['raw_preds'].columns):
@@ -215,10 +212,8 @@ def main(args):
 
             metric_name = m['name'] if '%' not in m['name'] else (m['name'] % m['kwargs'][m['kwarg_name_fill']])
             
-            metric_mean, metric_std = get_metric_CV(r['raw_preds'], m['function'], **m['kwargs'])
+            metric_mean, metric_std = get_metric_CV(r['raw_preds'], m['function'], submodel = submodel, **m['kwargs'])
             r['new_metrics'][metric_name] = {'mean' : metric_mean, 'standard_deviation' : metric_std}
-
-        print()
 
     # Turning new metric results into a dataframe
     new_metrics = pd.DataFrame(columns = ['metric', 'mean', 'standard_deviation', 'model_name', 'dataset', 
@@ -262,4 +257,4 @@ if __name__ == '__main__':
     # Compute metrics
     new_metrics = main(args)
 
-    new_metrics.head()
+    print(new_metrics.head())
