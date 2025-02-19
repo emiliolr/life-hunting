@@ -1,1 +1,1 @@
-python run_cross_validation.py --gdrive 1 --dataset mammals --model_to_use FLAML_hurdle --vals_to_save metrics raw --num_folds 5 --block_type random --time_budget_mins 0.1 --ensemble 0
+python run_cross_validation.py --gdrive 1 --dataset mammals --model_to_use FLAML_hurdle --vals_to_save raw --num_folds 5 --block_type random --time_budget_mins 0.01 --rebalance_dataset 1

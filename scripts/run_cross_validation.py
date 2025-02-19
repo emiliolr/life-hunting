@@ -296,7 +296,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         back_transform = True
         sklearn_submodels = False
         direct = None
-        tune_hurdle_thresh = True
+        tune_hurdle_thresh = True if not args.rebalance_dataset else False
         
         fit_args = {'zero' : zero_settings, 'nonzero' : nonzero_settings}
         pp_args = {'include_indicators' : False,
@@ -314,6 +314,14 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                 if (len(zero_columns) == 0) and (len(nonzero_columns) == 0):
                     model_name += '_JUST'
             model_name += f'_{'+'.join(args.embeddings_to_use)}'
+       
+        if args.rebalance_dataset:
+            model_name += '_rebalance-classes'
+        else:
+            model_name += '_tune-thresh'
+
+        if args.ensemble:
+            model_name += '_ensemble'
 
     # FLAML AutoML direct regression model
     elif args.model_to_use == 'FLAML_regression':

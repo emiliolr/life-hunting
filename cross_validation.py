@@ -133,6 +133,9 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
 
     # Data structure for saving predictions
     all_preds = {'index' : [], 'fold' : [], 'actual' : [], 'predicted' : []}
+    if direct is None:
+        all_preds['predicted_zero'] = []
+        all_preds['predicted_nonzero'] = []
 
     # Running the k-fold cross-validation
     for i, split in enumerate(splits):
@@ -183,7 +186,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
                     print(f'  optimal threshold was found to be {model.prob_thresh}')
 
             #  predicting on the test set
-            y_pred = model.predict(test_data)
+            y_pred, y_pred_zero, y_pred_nonzero = model.predict(test_data, return_constit_preds = True)
 
             resp_col = 'ratio' if pp_args['dataset'] in ['mammals', 'both'] else 'RR'
             if pp_args['dataset'] == 'mammals_extended':
@@ -223,7 +226,11 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
         all_preds['index'].extend(train_test_idxs['test'])
         all_preds['fold'].extend([i for k in range(len(y_test))])
         all_preds['actual'].extend(y_test)
+
         all_preds['predicted'].extend(y_pred)
+        if direct is None:
+            all_preds['predicted_zero'].extend(y_pred_zero)
+            all_preds['predicted_nonzero'].extend(np.exp(y_pred_nonzero)) # making sure this is expressed as a ratio rather than log-transformed
 
         # Get metrics
         if pp_args['dataset'] != 'both':
@@ -355,7 +362,7 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
 
     block_name = cross_val_params['block_type'] if cross_val_params['block_type'] is not None else 'random'
 
-    if dataset != 'both':
+    if (dataset != 'both') and ('metrics' in vals_to_save):
         # Setting mutable defaults
         assert (class_metrics is not None) or (reg_metrics is not None), 'Make sure one of "class_metrics" or "reg_metrics" is not None.'
         assert len(metrics_dict) > 0, 'The inputted "metrics_dict" has no entries.'
@@ -438,5 +445,5 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
         preds_fp = os.path.join(save_fp, 'raw_predictions', save_filename)
         raw_preds.to_csv(preds_fp)
 
-    if dataset != 'both':
+    if (dataset != 'both') and ('metrics' in vals_to_save):
         return final_results

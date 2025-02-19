@@ -91,7 +91,7 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
             print('Fitting the zero model...')
         self.zero_model.fit(X_zero, y_zero, **fit_args['zero'])
 
-    def predict(self, pp_data):
+    def predict(self, pp_data, return_constit_preds = False):
         X_zero, X_nonzero = get_zero_nonzero_datasets(pp_data, extirp_pos = self.extirp_pos, pred = True, **self.data_args)
 
         y_pred_zero = self.zero_model.predict_proba(X_zero)[ : , 1] >= self.prob_thresh # hard classification
@@ -99,6 +99,8 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
 
         y_pred = (~y_pred_zero).astype(int) * y_pred_nonzero if self.extirp_pos else y_pred_zero.astype(int) * y_pred_nonzero
 
+        if return_constit_preds:
+            return y_pred, y_pred_zero.astype(int), y_pred_nonzero
         return y_pred
 
 class TwoStageNovelModel(RegressorMixin, BaseEstimator):
