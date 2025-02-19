@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.metrics import recall_score, balanced_accuracy_score, mean_absolute_error, median_absolute_error
 from scipy.stats import ks_2samp, wasserstein_distance
 
-def mean_absolute_error_range(y_true, y_pred, lower_bound = 0, upper_bound = 1):
+def mean_absolute_error_range(y_true, y_pred, lower_bound = 0, upper_bound = 1, return_pct_kept = True):
 
     """
     A function to compute the mean absolute error for a specified range of true
@@ -21,6 +21,8 @@ def mean_absolute_error_range(y_true, y_pred, lower_bound = 0, upper_bound = 1):
         the lower bound on indices to keep (based on labels)
     upper_bound : float
         the upper bound on indices to keep (based on labels)
+    return_pct_kept : boolean
+        whether to return the percent of data points used in the operation
 
     Returns
     -------
@@ -35,11 +37,13 @@ def mean_absolute_error_range(y_true, y_pred, lower_bound = 0, upper_bound = 1):
     y_pred_sub = y_pred[bound_mask]
 
     mae_range = mean_absolute_error(y_true_sub, y_pred_sub)
-    pct_kept = len(y_true_sub) / len(y_true)
+    
+    if return_pct_kept:
+        pct_kept = len(y_true_sub) / len(y_true)
+        return mae_range, pct_kept
+    return mae_range
 
-    return mae_range, pct_kept
-
-def median_absolute_error_range(y_true, y_pred, lower_bound = 0, upper_bound = 1):
+def median_absolute_error_range(y_true, y_pred, lower_bound = 0, upper_bound = 1, return_pct_kept = True):
 
     """
     A function to compute the median absolute error for a specified range of true
@@ -55,6 +59,8 @@ def median_absolute_error_range(y_true, y_pred, lower_bound = 0, upper_bound = 1
         the lower bound on indices to keep (based on labels)
     upper_bound : float
         the upper bound on indices to keep (based on labels)
+    return_pct_kept : boolean
+        whether to return the percent of data points used in the operation
 
     Returns
     -------
@@ -69,9 +75,11 @@ def median_absolute_error_range(y_true, y_pred, lower_bound = 0, upper_bound = 1
     y_pred_sub = y_pred[bound_mask]
 
     mae_range = median_absolute_error(y_true_sub, y_pred_sub)
-    pct_kept = len(y_true_sub) / len(y_true)
-
-    return mae_range, pct_kept
+    
+    if return_pct_kept:
+        pct_kept = len(y_true_sub) / len(y_true)
+        return mae_range, pct_kept
+    return mae_range
 
 def root_median_squared_error(y_true, y_pred):
 
@@ -214,6 +222,18 @@ def balanced_accuracy_DI_cats(y_true, y_pred, neighborhood = 0.05):
     ba = balanced_accuracy_score(y_true_cats, y_pred_cats)
 
     return ba
+
+def wasserstein_distance_range(y_true, y_pred, lower_bound = 0, upper_bound = 2):
+
+    # Pulling out just the range of values that we're interested in
+    bound_mask = (y_true >= lower_bound) & (y_true <= upper_bound)
+    y_true_sub = y_true[bound_mask]
+    y_pred_sub = y_pred[bound_mask]
+
+    # Compute the Wasserstein Distance on this subset of predictions
+    wd_range = wasserstein_distance(y_true_sub, y_pred_sub)
+
+    return wd_range
 
 if __name__ == '__main__':
     import pandas as pd
