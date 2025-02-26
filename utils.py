@@ -377,7 +377,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         if indicator_columns is None:
             indicator_columns = ['Country', 'Species']
             if dataset == 'mammals':
-                indicator_columns += ['Study', 'Family']
+                indicator_columns += ['Study']
         if nonzero_columns is None:
             nonzero_columns = ['BM', 'DistKm', 'PopDens']
             if dataset == 'both':
@@ -469,10 +469,14 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         y_zero = y_zero[outlier_mask]
         y_nonzero = np.log(ratio[nonzero_mask & outlier_mask].copy())
 
+        #  optionally rebalancing classes using the categorical-friendly version of SMOTE
         if rebalance_dataset:
-            assert dataset == 'mammals', 'Oversampling of minority class only supported for mammal dataset currently'
+            assert dataset in ['mammals', 'birds'], 'Oversampling of minority class only supported for mammals and birds datasets'
 
-            smote = SMOTENC(categorical_features = ['Reserve'], random_state = 1693)
+            smote_columns = set(['Country', 'Species', 'Study', 'Reserve']).intersection(zero_columns + indicator_columns)
+            smote_columns = list(smote_columns)
+
+            smote = SMOTENC(categorical_features = smote_columns, random_state = 1693)
             X_zero, y_zero = smote.fit_resample(X_zero, y_zero)
 
         return X_zero, y_zero, X_nonzero, y_nonzero

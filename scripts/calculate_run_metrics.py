@@ -1,6 +1,7 @@
 import sys
 import os
 import argparse
+from datetime import datetime
 
 sys.path.append('..')
 
@@ -15,6 +16,11 @@ def get_run_info_from_fname(filename):
     Extract all relevant info for a model run from the model run's filename.
     """
 
+    # Some initial checking to remove runs which can't be parsed in the same way
+    if ('SPECIAL' in filename) or ('CLIP' in filename):
+        return None
+
+    # Parsing the file name
     bits = filename.split('_')
 
     model = bits[0]
@@ -34,6 +40,10 @@ def get_run_info_from_fname(filename):
         model_name = bits[0 : 2]
         i = 2
     model_name = '_'.join(model_name)
+
+    #  ignoring direct regression & classification models
+    if (model_name.startswith('FLAML_classification')) or (model_name.startswith('FLAML_regression')):
+        return None
 
     if bits[i + 1] == 'extended':
         dataset = bits[i : i + 2]
@@ -188,14 +198,21 @@ def main(args):
 
     #  get run info and read in raw prediction dataframe
     runs_to_eval = [get_run_info_from_fname(r) for r in runs_to_eval]
+    runs_to_eval = [r for r in runs_to_eval if r is not None]
 
     for r in runs_to_eval:
-        df = pd.read_csv(os.path.join(args.pred_dir, r['filename']), index_col = 'index')
+        fp = os.path.join(args.pred_dir, r['filename'])
+
+        df = pd.read_csv(fp, index_col = 'index')
         if 'predicted_zero' in df.columns:
             df['actual_zero'] = (df['actual'] == 0).astype(int) if args.extirp_pos else (df['actual'] != 0).astype(int) 
+
+        date = os.path.getmtime(fp)
+        date = datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S')
         
         r['raw_preds'] = df
         r['new_metrics'] = {}
+        r['date'] = date
 
     # Getting the list of metrics to use
     metrics = metrics_to_use()
@@ -217,14 +234,14 @@ def main(args):
 
     # Turning new metric results into a dataframe
     new_metrics = pd.DataFrame(columns = ['metric', 'mean', 'standard_deviation', 'model_name', 'dataset', 
-                                          'num_folds', 'block_type', 'spatial_spacing', 'group_col'])
+                                          'date', 'num_folds', 'block_type', 'spatial_spacing', 'group_col'])
 
     i = 0
     for r in runs_to_eval:
         new_metrics_vals = r['new_metrics']
         for m in new_metrics_vals.keys():
             row = [m, new_metrics_vals[m]['mean'], new_metrics_vals[m]['standard_deviation'], r['model_name'], r['dataset'], 
-                   r['num_folds'], r['block_type'], r['spatial_spacing'], r['group_col']]
+                   r['date'], r['num_folds'], r['block_type'], r['spatial_spacing'], r['group_col']]
             
             new_metrics.loc[i] = row
             i += 1
@@ -237,7 +254,6 @@ def main(args):
 
     return new_metrics
     
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -256,5 +272,4 @@ if __name__ == '__main__':
 
     # Compute metrics
     new_metrics = main(args)
-
     print(new_metrics.head())

@@ -1,6 +1,7 @@
 import os
 import warnings
 from datetime import datetime
+import json
 
 import pandas as pd
 import numpy as np
@@ -326,7 +327,7 @@ def format_cv_results(metric_dict_sub, class_metrics, reg_metrics, result_type =
     return results
 
 def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_metrics = None,
-                    reg_metrics = None, vals_to_save = None, dataset = 'mammals'):
+                    reg_metrics = None, vals_to_save = None, dataset = 'mammals', full_cv_args = None):
 
     """
     A helper function to wrap the re-formatting and aggregation of the results dictionary
@@ -432,18 +433,26 @@ def save_cv_results(metrics_dict, model_name, save_fp, cross_val_params, class_m
                 final_results.to_csv(save_filename, index = False)
 
     # Saving the raw predictions
+    save_filename = f'{model_name}_{dataset}_{cross_val_params["num_folds"]}-fold_{block_name}-blocking'
+    if cross_val_params['block_type'] == 'spatial':
+        save_filename += f'_{cross_val_params["spatial_spacing"]}-degree'
+    elif cross_val_params['block_type'] == 'group':
+        save_filename += f'_{cross_val_params["group_col"].lower()}'
+
     if 'raw' in vals_to_save:
         raw_preds = metrics_dict['raw_preds']
+        save_filename_csv = save_filename + '.csv'
 
-        save_filename = f'{model_name}_{dataset}_{cross_val_params["num_folds"]}-fold_{block_name}-blocking'
-        if cross_val_params['block_type'] == 'spatial':
-            save_filename += f'_{cross_val_params["spatial_spacing"]}-degree'
-        elif cross_val_params['block_type'] == 'group':
-            save_filename += f'_{cross_val_params["group_col"].lower()}'
-        save_filename += '.csv'
-
-        preds_fp = os.path.join(save_fp, 'raw_predictions', save_filename)
+        preds_fp = os.path.join(save_fp, 'raw_predictions', save_filename_csv)
         raw_preds.to_csv(preds_fp)
+
+    # Saving the full CV args as a json
+    if full_cv_args is not None:
+        save_filename_json = save_filename + '.json'
+        params_fp = os.path.join(save_fp, 'full_experiment_params', save_filename_json)
+
+        with open(params_fp, 'w') as f:
+            json.dump(vars(full_cv_args), f)
 
     if (dataset != 'both') and ('metrics' in vals_to_save):
         return final_results

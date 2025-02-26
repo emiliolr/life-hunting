@@ -152,6 +152,21 @@ def balanced_accuracy_FLAML(X_val, y_val, estimator, labels, X_train, y_train,
 
     return val_acc, {'val_acc' : val_acc, 'pred_time' : pred_time}
 
+def median_absolute_error_FLAML(X_val, y_val, estimator, labels, X_train, y_train,
+                                weight_val = None, weight_train = None, *args):
+
+    """
+    A wrapper function to port median absolute error to FLAML. See this page for details
+    on parameters and returns: https://microsoft.github.io/FLAML/docs/Use-Cases/Task-Oriented-AutoML/#optimization-metric.
+    """
+
+    start = time.time()
+    y_pred = estimator.predict(X_val)
+    pred_time = (time.time() - start) / len(X_val)
+    val_med_ae = median_absolute_error(y_val, y_pred)
+
+    return val_med_ae, {'val_acc' : val_med_ae, 'pred_time' : pred_time}
+
 def mean_absolute_percent_error_tau(y_true, y_pred, tau = 0, return_pct_kept = False, epsilon = 1e-4):
 
     """

@@ -5,6 +5,7 @@ import warnings
 import argparse
 
 sys.path.append('..')
+warnings.simplefilter(action = 'ignore', category = FutureWarning)
 
 import pandas as pd
 import numpy as np
@@ -20,7 +21,7 @@ from flaml import AutoML
 
 from utils import read_csv_non_utf
 from model_utils import HurdleModelEstimator, PymerModelWrapper
-from custom_metrics import balanced_accuracy_FLAML, mean_absolute_error_range
+from custom_metrics import balanced_accuracy_FLAML, median_absolute_error_FLAML, mean_absolute_error_range
 from cross_validation import run_cross_val, save_cv_results
 
 def read_data(args):
@@ -150,8 +151,11 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         #  hurdle model params
         extirp_pos = False
 
-        outlier_cutoff = 15 if args.dataset == 'mammals' else 5
-        data_args = {'outlier_cutoff' : outlier_cutoff, 'dataset' : args.dataset}
+        if args.outlier_cutoff is None:
+            args.outlier_cutoff = 15 if args.dataset == 'mammals' else 5
+        data_args = {'outlier_cutoff' : args.outlier_cutoff, 
+                     'dataset' : args.dataset, 
+                     'rebalance_dataset' : args.rebalance_dataset}
 
         #  setting up the hurdle model
         zero_model = PymerModelWrapper(Lmer, formula = formula_zero, family = 'binomial', control_str = control_str, 
@@ -165,7 +169,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         back_transform = True
         sklearn_submodels = False
         direct = None
-        tune_hurdle_thresh = True
+        tune_hurdle_thresh = True if not args.rebalance_dataset else False
         
         fit_args = None
         pp_args = {'include_indicators' : False,
@@ -230,17 +234,18 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         base_path = os.path.join('..', 'model_saves')
         
         zero_metric = balanced_accuracy_FLAML
-        nonzero_metric = 'mse'
+        nonzero_metric = median_absolute_error_FLAML
 
         #  hurdle model params
         verbose = 0
         extirp_pos = False
         
         if args.dataset in ['mammals', 'both']:
-            zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime', 
-                            'LivestockBio', 'Reserve'] + (['Literacy'] if args.dataset == 'mammals' else [])
+            zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime', 'LivestockBio', 'Reserve'] 
+            zero_columns = zero_columns + (['Literacy'] if args.dataset == 'mammals' else [])
         elif args.dataset == 'birds':
-            zero_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting', 'FoodBiomass', 'Forest_cover', 'NPP', 'Body_Mass']
+            zero_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting', 'FoodBiomass', 'Forest_cover', 'NPP', 
+                            'Body_Mass', 'Reserve']
         elif args.dataset in ['birds_extended', 'mammals_extended']:
             zero_columns = None # just using defaults here, which is all available predictors...
         nonzero_columns = zero_columns
@@ -251,26 +256,34 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         nonzero_model = AutoML()
         
         #  specify fitting paramaters
+        zero_models_to_try = args.flaml_single_model
+        if zero_models_to_try is None:
+            zero_models_to_try = ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor', 'lrl1', 'lrl2']
+
         zero_settings = {
             'time_budget' : args.time_budget_mins * 60,  # in seconds
             'metric' : zero_metric,
             'task' : 'classification',
             'log_file_name' : os.path.join(base_path, f'{args.dataset}_nonlinear_hurdle_ZERO.log'),
             'seed' : 1693,
-            'estimator_list' : ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor', 'lrl1', 'lrl2'],
+            'estimator_list' : zero_models_to_try,
             'early_stop' : True,
             'verbose' : verbose,
             'keep_search_state' : True,
             'eval_method' : 'cv'
         }
         
+        nonzero_models_to_try = args.flaml_single_model
+        if nonzero_models_to_try is None:
+            nonzero_models_to_try = ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor']
+
         nonzero_settings = {
             'time_budget' : args.time_budget_mins * 60,  # in seconds
             'metric' : nonzero_metric,
             'task' : 'regression',
             'log_file_name' : os.path.join(base_path, f'{args.dataset}_nonlinear_hurdle_NONZERO.log'),
             'seed' : 1693,
-            'estimator_list' : ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor'],
+            'estimator_list' : nonzero_models_to_try,
             'early_stop' : True,
             'verbose' : verbose,
             'keep_search_state' : True,
@@ -288,7 +301,8 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                      'zero_columns' : zero_columns,
                      'dataset' : args.dataset,
                      'embeddings_to_use' : args.embeddings_to_use,
-                     'rebalance_dataset' : args.rebalance_dataset}
+                     'rebalance_dataset' : args.rebalance_dataset,
+                     'outlier_cutoff' : args.outlier_cutoff if args.outlier_cutoff is not None else np.Inf}
         model = HurdleModelEstimator(zero_model, nonzero_model, extirp_pos = extirp_pos, 
                                      data_args = data_args, verbose = False)
 
@@ -314,11 +328,6 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                 if (len(zero_columns) == 0) and (len(nonzero_columns) == 0):
                     model_name += '_JUST'
             model_name += f'_{'+'.join(args.embeddings_to_use)}'
-       
-        if args.rebalance_dataset:
-            model_name += '_rebalance-classes'
-        else:
-            model_name += '_tune-thresh'
 
         if args.ensemble:
             model_name += '_ensemble'
@@ -416,14 +425,23 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         #  results saving params
         model_name = 'dummy_regressor'
 
+    # Some general configuration stuff
+    if args.rebalance_dataset:
+        model_name += '_rebalance-classes'
+    else:
+        model_name += '_tune-thresh'
+
     # Making sure the save directory exists for autoML training
     if args.model_to_use.startswith('FLAML'):
         if not os.path.exists(base_path):
             os.mkdir(base_path)
 
+    # Printing some run info before running cross-validation
     print(f'Training/testing on {args.dataset} dataset{'s' if args.dataset == 'both' else ''}\n')
+    print(f'Using {model_name} with{" no" if args.outlier_cutoff is None else ""} outlier cutoff {"of " + str(args.outlier_cutoff) if args.outlier_cutoff is not None else ""}\n')
 
-    print(f'Using {model_name}\n')
+    if (args.model_to_use == 'FLAML_hurdle') and (args.flaml_single_model is not None):
+        print(f'Using FLAML to hyperparameter tune just {args.flaml_single_model[0]}\n')
 
     if args.dataset != 'both':
         all_metric_names = list(class_metrics['per_class']) + list(class_metrics['overall']) + (list(reg_metrics.keys()) if reg_metrics is not None else [])
@@ -449,9 +467,10 @@ def save_results(args, metrics_dict, model_name, class_metrics, reg_metrics):
     if not os.path.exists(args.save_fp):
         os.mkdir(args.save_fp)
         os.mkdir(os.path.join(args.save_fp, 'raw_predictions'))
+        os.mkdir(os.path.join(args.save_fp, 'full_experiment_params'))
 
     save_cv_results(metrics_dict, model_name, args.save_fp, cross_val_params, class_metrics, reg_metrics,
-                    args.vals_to_save, args.dataset)
+                    args.vals_to_save, args.dataset, args)
     print(f'Saved results at {args.save_fp}')
 
 def main(args):
@@ -474,6 +493,7 @@ if __name__ == '__main__':
     parser.add_argument('--gdrive', type = int, default = 1)
     parser.add_argument('--dataset', type = str, default = 'birds', choices = ['mammals', 'birds', 'birds_extended', 'mammals_extended', 'both'])
     parser.add_argument('--rebalance_dataset', type = int, default = 0)
+    parser.add_argument('--outlier_cutoff', type = float, default = 1000)
 
     # MODEL PARAMS
     parser.add_argument('--model_to_use', type = str, default = 'FLAML_hurdle', choices = ['pymer', 'sklearn', 'FLAML_hurdle', 'FLAML_regression', 'FLAML_classification', 'dummy_regressor'])
@@ -494,6 +514,7 @@ if __name__ == '__main__':
     # NONLINEAR FLAML MODELS PARAMS
     parser.add_argument('--time_budget_mins', type = float, default = 0.1)
     parser.add_argument('--ensemble', type = int, default = 0)
+    parser.add_argument('--flaml_single_model', type = str, default = '', choices = ['rf', 'xgboost'])
 
     # EMBEDDING PARAMS
     parser.add_argument('--embeddings_to_use', type = str, nargs = '*', default = [], choices = ['SatCLIP', 'BioCLIP'])
@@ -506,6 +527,14 @@ if __name__ == '__main__':
 
     if (args.group_col == 'species') and (args.dataset.startswith('birds') or (args.dataset == 'mammals_extended')):
         args.group_col = 'Species'
+
+    if args.outlier_cutoff == 1000:
+        args.outlier_cutoff = None
+
+    if args.flaml_single_model == '':
+        args.flaml_single_model = None
+    else:
+        args.flaml_single_model = [args.flaml_single_model]
 
     args.gdrive = bool(args.gdrive)
     args.use_rfx = bool(args.use_rfx)
