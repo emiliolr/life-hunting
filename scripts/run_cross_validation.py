@@ -169,7 +169,6 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         back_transform = True
         sklearn_submodels = False
         direct = None
-        tune_hurdle_thresh = True if not args.rebalance_dataset else False
         
         fit_args = None
         pp_args = {'include_indicators' : False,
@@ -216,7 +215,6 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         back_transform = True
         sklearn_submodels = True
         direct = None
-        tune_hurdle_thresh = True
         
         fit_args = None
         pp_args = {'include_indicators' : False,
@@ -310,7 +308,6 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         back_transform = True
         sklearn_submodels = False
         direct = None
-        tune_hurdle_thresh = True if not args.rebalance_dataset else False
         
         fit_args = {'zero' : zero_settings, 'nonzero' : nonzero_settings}
         pp_args = {'include_indicators' : False,
@@ -322,7 +319,11 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                    'embeddings_args' : args.embeddings_args}
 
         #  results saving params
-        model_name = f'FLAML_hurdle_{args.time_budget_mins}mins'
+        if args.flaml_single_model is None:
+            model_name = f'FLAML_hurdle_{args.time_budget_mins}mins'
+        else:
+            model_name = f'{args.flaml_single_model}_hurdle_{args.time_budget_mins}mins'
+
         if args.embeddings_to_use is not None:
             if (zero_columns is not None) and (nonzero_columns is not None):
                 if (len(zero_columns) == 0) and (len(nonzero_columns) == 0):
@@ -356,7 +357,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         back_transform = False
         sklearn_submodels = False
         direct = 'regression'
-        tune_hurdle_thresh = False
+        args.tune_thresh = False
 
         fit_args = automl_settings
         pp_args = {'include_indicators' : False,
@@ -392,7 +393,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         back_transform = False
         sklearn_submodels = False
         direct = 'classification'
-        tune_hurdle_thresh = False
+        args.tune_thresh = False
         reg_metrics = None
 
         fit_args = automl_settings
@@ -413,7 +414,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         back_transform = False
         sklearn_submodels = False
         direct = 'regression'
-        tune_hurdle_thresh = False
+        args.tune_thresh = False
 
         fit_args = None
         pp_args = {'include_indicators' : False,
@@ -428,7 +429,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
     # Some general configuration stuff
     if args.rebalance_dataset:
         model_name += '_rebalance-classes'
-    else:
+    if args.tune_thresh:
         model_name += '_tune-thresh'
 
     # Making sure the save directory exists for autoML training
@@ -452,7 +453,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                                  group_col = args.group_col, spatial_spacing = args.spatial_spacing, fit_args = fit_args, 
                                  pp_args = pp_args, class_metrics = class_metrics, reg_metrics = reg_metrics, 
                                  verbose = True, random_state = 1693, sklearn_submodels = sklearn_submodels, 
-                                 back_transform = back_transform, direct = direct, tune_hurdle_thresh = tune_hurdle_thresh)
+                                 back_transform = back_transform, direct = direct, tune_hurdle_thresh = args.tune_thresh)
     
     return metrics_dict, model_name
     
@@ -493,6 +494,7 @@ if __name__ == '__main__':
     parser.add_argument('--gdrive', type = int, default = 1)
     parser.add_argument('--dataset', type = str, default = 'birds', choices = ['mammals', 'birds', 'birds_extended', 'mammals_extended', 'both'])
     parser.add_argument('--rebalance_dataset', type = int, default = 0)
+    parser.add_argument('--tune_thresh', type = int, default = 1)
     parser.add_argument('--outlier_cutoff', type = float, default = 1000)
 
     # MODEL PARAMS
@@ -525,7 +527,7 @@ if __name__ == '__main__':
     # Parse args and fix some types
     args = parser.parse_args()
 
-    if (args.group_col == 'species') and (args.dataset.startswith('birds') or (args.dataset == 'mammals_extended')):
+    if (args.group_col == 'species') and (args.dataset.startswith('birds') or (args.dataset.startswith('mammals'))):
         args.group_col = 'Species'
 
     if args.outlier_cutoff == 1000:
@@ -540,6 +542,7 @@ if __name__ == '__main__':
     args.use_rfx = bool(args.use_rfx)
     args.ensemble = bool(args.ensemble)
     args.rebalance_dataset = bool(args.rebalance_dataset)
+    args.tune_thresh = bool(args.tune_thresh)
 
     if args.embeddings_to_use == []:
         args.embeddings_to_use = None

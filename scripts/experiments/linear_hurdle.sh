@@ -1,0 +1,1 @@
+python run_cross_validation.py --gdrive 1 --dataset birds --model_to_use pymer --vals_to_save metrics raw --num_folds 5 --block_type spatial --spatial_spacing 5 --use_rfx 0 --rebalance_dataset 1 --tune_thresh 1 --outlier_cutoff 5 --save_fp ../final_results
