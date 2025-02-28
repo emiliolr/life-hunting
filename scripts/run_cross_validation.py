@@ -322,7 +322,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         if args.flaml_single_model is None:
             model_name = f'FLAML_hurdle_{args.time_budget_mins}mins'
         else:
-            model_name = f'{args.flaml_single_model}_hurdle_{args.time_budget_mins}mins'
+            model_name = f'{args.flaml_single_model[0]}_hurdle_{args.time_budget_mins}mins'
 
         if args.embeddings_to_use is not None:
             if (zero_columns is not None) and (nonzero_columns is not None):

@@ -24,12 +24,19 @@ def get_run_info_from_fname(filename):
     bits = filename.split('_')
 
     model = bits[0]
-    assert bits[0] in ['pymer', 'FLAML', 'dummy'], f'Model "{bits[0]}" is not currently implemented in this function'
+    assert bits[0] in ['pymer', 'FLAML', 'xgboost', 'rf', 'dummy'], f'Model "{bits[0]}" is not currently implemented in this function'
     
     if model == 'pymer':
-        model_name = bits[0 : 4]
-        i = 4
-    elif model == 'FLAML':
+        if ('rebalance' in filename) and ('tune' in filename):
+            model_name = bits[0 : 6]
+            i = 6
+        elif ('rebalance' in filename) or ('tune' in filename):
+            model_name = bits[0 : 5]
+            i = 5
+        else:
+            model_name = bits[0 : 4]
+            i = 4
+    elif model in ['FLAML', 'xgboost', 'rf']:
         if ('rebalance' in filename) or ('tune' in filename) or ('ensemble' in filename):
             model_name = bits[0 : 4]
             i = 4
