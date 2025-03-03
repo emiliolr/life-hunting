@@ -1,0 +1,3 @@
+python run_cross_validation.py --gdrive 1 --dataset birds --model_to_use dummy_regressor --dummy_strat median --vals_to_save metrics raw --num_folds 5 --block_type random --save_fp ../final_results
+python run_cross_validation.py --gdrive 1 --dataset birds --model_to_use dummy_regressor --dummy_strat median --vals_to_save metrics raw --num_folds 5 --block_type group --group_col species --save_fp ../final_results
+python run_cross_validation.py --gdrive 1 --dataset birds --model_to_use dummy_regressor --dummy_strat median --vals_to_save metrics raw --num_folds 5 --block_type spatial --spatial_spacing 5 --save_fp ../final_results

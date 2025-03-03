@@ -44,8 +44,8 @@ def get_run_info_from_fname(filename):
             model_name = bits[0 : 3]
             i = 3
     elif model == 'dummy':
-        model_name = bits[0 : 2]
-        i = 2
+        model_name = bits[0 : 3]
+        i = 3
     model_name = '_'.join(model_name)
 
     #  ignoring direct regression & classification models

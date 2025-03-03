@@ -438,7 +438,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     X_nonzero = pp_data[[]].copy(deep = True)
     X_zero = pp_data[[]].copy(deep = True)
 
-    #  filling in like this ensures this works for polynomial features as well
+    #  filling in like this ensures this works for polynomial features/indicator variables
     for col in nonzero_columns:
         X_nonzero = pd.concat((X_nonzero, pp_data.filter(like = col)), axis = 1)
     for col in zero_columns:
@@ -471,11 +471,25 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
 
         #  optionally rebalancing classes using the categorical-friendly version of SMOTE
         if rebalance_dataset:
-            assert dataset in ['mammals', 'birds'], 'Oversampling of minority class only supported for mammals and birds datasets'
+            assert dataset in ['mammals', 'birds', 'mammals_extended', 'birds_extended'], 'Oversampling of minority class only supported for mammals and birds datasets'
 
-            smote_columns = set(['Country', 'Species', 'Study', 'Reserve']).intersection(zero_columns + indicator_columns)
-            smote_columns = list(smote_columns)
+            #  defining all candidate columns which are categorical over the different datasets
+            all_cat_cols = ['Country', 'Species', 'Study', 'Reserve']
+            if 'extended' in dataset:
+                all_cat_cols += ['Trophic_Niche', 'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Pet_Trade', 
+                                 'IUCN_Is_Threatened', 'Habitat_Is_Dense', 'Activity_Nocturnal', 'Activity_Crepuscular', 
+                                 'Activity_Diurnal', 'IUCN_For_Handicrafts', 'IUCN_For_Medicine', 'IUCN_Is_Sport_Hunted', 
+                                 'IUCN_For_Wearing_Apparel', 'Diet']
 
+            #  getting the correct columns, recognizing that naming convention may have changed with
+            #   addition of indicators variables
+            smote_columns = []
+            for c in X_zero.columns:
+                for k in all_cat_cols:
+                    if k in c:
+                        smote_columns.append(c)
+
+            #  applying the SMOTE algorithm to the data for synthetic oversampling
             smote = SMOTENC(categorical_features = smote_columns, random_state = 1693)
             X_zero, y_zero = smote.fit_resample(X_zero, y_zero)
 
@@ -568,7 +582,7 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
     # Optionally adding a polynomial basis expansion
     if polynomial_features > 1:
         poly = PolynomialFeatures(polynomial_features, include_bias = False)
-        pp_data_poly = poly.fit_transform(pp_data.drop(columns = ['Reserve']))
+        pp_data_poly = poly.fit_transform(pp_data)
 
         pp_data = pd.DataFrame(pp_data_poly, index = pp_data.index, columns = poly.get_feature_names_out())
         pp_data = pp_data.sort_index()

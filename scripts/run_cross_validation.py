@@ -310,7 +310,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         direct = None
         
         fit_args = {'zero' : zero_settings, 'nonzero' : nonzero_settings}
-        pp_args = {'include_indicators' : False,
+        pp_args = {'include_indicators' : True if 'extended' in args.dataset else False,
                    'include_categorical' : False,
                    'polynomial_features' : 0,
                    'log_trans_cont' : False,
@@ -424,7 +424,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                    'dataset' : args.dataset}
 
         #  results saving params
-        model_name = 'dummy_regressor'
+        model_name = f'dummy_regressor_{args.dummy_strat}'
 
     # Some general configuration stuff
     if args.rebalance_dataset:
