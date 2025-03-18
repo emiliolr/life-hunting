@@ -355,7 +355,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         the name of the embeddings to use (i.e., 'SatCLIP' and/or 'BioCLIP')
     dataset : string
         the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019),
-        'birds' (Ferreiro-Arias et al., 2024), 'both', or 'birds_extended'
+        'birds' (Ferreiro-Arias et al., 2024), or one of 'both', 'mammals_extended', 
+        'birds_extended', or 'mammals_recreated'
     rebalance_dataset : boolean
         should we oversample the minority class for the local extirpation model using
         the SMOTE algorithm?
@@ -386,6 +387,17 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
             zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'Reserve']
             if dataset == 'both':
                 zero_columns += ['TravTime']
+    elif dataset == 'mammals_recreated':
+        if indicator_columns is None:
+            indicator_columns = []
+        all_cols = ['Body_Mass', 'GDP_Per_Capita', 'Stunting_Pct', 'Literacy_Rate',
+                    'Dist_Settlement_KM', 'Travel_Time_Small', 'Travel_Time_Large',
+                    'Livestock_Biomass', 'Population_Density', 'Forest_Cover', 'NPP', 
+                    'Protected_Area', 'Year']
+        if nonzero_columns is None:
+            nonzero_columns = all_cols
+        if zero_columns is None:
+            zero_columns = all_cols
     elif dataset == 'birds':
         if indicator_columns is None:
             indicator_columns = ['Country', 'Species']
@@ -413,24 +425,19 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     elif dataset == 'mammals_extended':
         if indicator_columns is None:
             indicator_columns = []
+        all_cols = ['Diet', 'Body_Mass', 'Year', 'Dist_Access_Pts', 'Travel_Time', 
+                    'Livestock_Biomass', 'Stunting', 'Population_Density', 'Literacy', 
+                    'Forest_Cover', 'NPP', 'Reserve', 'Activity_Nocturnal', 
+                    'Activity_Crepuscular', 'Activity_Diurnal', 'IUCN_Is_Hunted',
+                    'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 'IUCN_For_Medicine', 
+                    'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 'IUCN_For_Wearing_Apparel', 
+                    'IUCN_Is_Threatened']
         if nonzero_columns is None:
-            nonzero_columns = ['Diet', 'Body_Mass', 'Year', 'Dist_Access_Pts', 'Travel_Time', 
-                               'Livestock_Biomass', 'Stunting', 'Population_Density', 'Literacy', 
-                               'Forest_Cover', 'NPP', 'Reserve', 'Activity_Nocturnal', 
-                               'Activity_Crepuscular', 'Activity_Diurnal', 'IUCN_Is_Hunted',
-                               'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 'IUCN_For_Medicine', 
-                               'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 'IUCN_For_Wearing_Apparel', 
-                               'IUCN_Is_Threatened']
+            nonzero_columns = all_cols
         if zero_columns is None:
-            zero_columns = ['Diet', 'Body_Mass', 'Year', 'Dist_Access_Pts', 'Travel_Time', 
-                            'Livestock_Biomass', 'Stunting', 'Population_Density', 'Literacy', 
-                            'Forest_Cover', 'NPP', 'Reserve', 'Activity_Nocturnal', 
-                            'Activity_Crepuscular', 'Activity_Diurnal', 'IUCN_Is_Hunted',
-                            'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 'IUCN_For_Medicine', 
-                            'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 'IUCN_For_Wearing_Apparel', 
-                            'IUCN_Is_Threatened']
+            zero_columns = all_cols
     else:
-        raise ValueError('The only supported datasets are "mammals," "birds," "both", "birds_extended", or "mammals_extended".')
+        raise ValueError('The only supported datasets are "mammals," "birds," "both", "birds_extended", "mammals_extended", or "mammals_recreated".')
 
     if embeddings_to_use is None:
         embeddings_to_use = []
@@ -457,6 +464,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
         resp_col = 'ratio' if dataset in ['mammals', 'both'] else 'RR'
         if dataset == 'mammals_extended':
             resp_col = 'Ratio'
+        elif dataset == 'mammals_recreated':
+            resp_col = 'Response_Ratio'
 
         ratio = pp_data[resp_col].values
         nonzero_mask = (ratio != 0)
@@ -471,7 +480,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
 
         #  optionally rebalancing classes using the categorical-friendly version of SMOTE
         if rebalance_dataset:
-            assert dataset in ['mammals', 'birds', 'mammals_extended', 'birds_extended'], 'Oversampling of minority class only supported for mammals and birds datasets'
+            assert dataset in ['mammals', 'birds', 'mammals_extended', 'birds_extended', 'mammals_recreated'], 'Oversampling of minority class only supported for mammals and birds datasets'
 
             #  defining all candidate columns which are categorical over the different datasets
             all_cat_cols = ['Country', 'Species', 'Study', 'Reserve']
@@ -480,6 +489,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
                                  'IUCN_Is_Threatened', 'Habitat_Is_Dense', 'Activity_Nocturnal', 'Activity_Crepuscular', 
                                  'Activity_Diurnal', 'IUCN_For_Handicrafts', 'IUCN_For_Medicine', 'IUCN_Is_Sport_Hunted', 
                                  'IUCN_For_Wearing_Apparel', 'Diet']
+            elif dataset == 'mammals_recreated':
+                all_cat_cols += ['Protected_Area']
 
             #  getting the correct columns, recognizing that naming convention may have changed with
             #   addition of indicators variables
@@ -528,7 +539,8 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         information (e.g., statistics) from training data
     dataset : string
         the dataset being used, either 'mammals' (Benitez-Lopez et al., 2019) or
-        'birds' (Ferreiro-Arias et al., 2024)
+        'birds' (Ferreiro-Arias et al., 2024) for original datasets, or one of 'both',
+        'birds_extended', 'mammals_extended', or 'mammals_recreated'
 
     Returns
     -------
@@ -550,6 +562,13 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
                               'LivestockBio'] + (['Literacy'] if dataset == 'mammals' else [])
         special_columns = ['Reserve']
         response_column = 'ratio'
+    elif dataset == 'mammals_recreated':
+        indicator_columns = ['Country', 'Species', 'Family', 'Order', 'Study', 'Region']
+        continuous_columns = ['Body_Mass', 'GDP_Per_Capita', 'Stunting_Pct', 'Literacy_Rate',
+                              'Dist_Settlement_KM', 'Travel_Time_Small', 'Travel_Time_Large',
+                              'Livestock_Biomass', 'Population_Density', 'Forest_Cover', 'NPP']
+        special_columns = ['Protected_Area', 'Year']
+        response_column = 'Response_Ratio'
     elif dataset == 'birds':
         indicator_columns = ['Study', 'Dataset', 'Order', 'Family', 'Species',
                              'Traded', 'Realm', 'Country', 'Food', 'Hunted']
@@ -574,7 +593,7 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
                            'IUCN_For_Wearing_Apparel', 'IUCN_Is_Threatened']
         response_column = 'Ratio'
     else:
-        raise ValueError('The only supported datasets are "mammals," "birds," "both", "birds_extended", or "mammals_extended".')
+        raise ValueError('The only supported datasets are "mammals," "birds," "both", "birds_extended", "mammals_extended", or "mammals_recreated".')
 
     # Grabbing just the continuous predictors
     pp_data = data[continuous_columns].copy(deep = True)
@@ -792,27 +811,18 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
     return X_train, y_train, X_test, y_test
 
 if __name__ == '__main__':
-    import json
-    
-    with open('config.json', 'r') as f:
-        config = json.load(f)
-
-    gdrive_fp = config['gdrive_path']
-    LIFE_fp = config['LIFE_folder']
-    dataset_fp = config['datasets_path']
-    benitez_lopez2019 = config['indiv_data_paths']['benitez_lopez2019']
-    
-    ben_lop_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019)
-    data = read_csv_non_utf(ben_lop_path)
+    ben_lop_rec_path = '/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated.csv'
+    data = pd.read_csv(ben_lop_rec_path)
 
     pp_data = preprocess_data(data, include_indicators = False, include_categorical = False,
                               standardize = True, log_trans_cont = False, polynomial_features = 0,
                               embeddings_to_use = None, embeddings_args = None, train_test_idxs = None,
-                              dataset = 'mammals')
+                              dataset = 'mammals_recreated')
     
     X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, outlier_cutoff = np.Inf, extirp_pos = False,
                                                                      zero_columns = None, nonzero_columns = None, indicator_columns = None,
-                                                                     embeddings_to_use = None, dataset = 'mammals', rebalance_dataset = True)
+                                                                     embeddings_to_use = None, dataset = 'mammals_recreated', 
+                                                                     rebalance_dataset = True)
 
     print(X_zero.columns)
     print('\n\n\n')

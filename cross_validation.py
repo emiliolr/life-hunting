@@ -192,6 +192,8 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
             resp_col = 'ratio' if pp_args['dataset'] in ['mammals', 'both'] else 'RR'
             if pp_args['dataset'] == 'mammals_extended':
                 resp_col = 'Ratio'
+            elif pp_args['dataset'] == 'mammals_recreated':
+                resp_col = 'Response_Ratio'
 
             y_test = test_data[resp_col].copy(deep = True)
 

@@ -40,11 +40,14 @@ def read_data(args):
 
         ferreiro_arias2024_ext = config['indiv_data_paths']['ferreiro_arias2024_extended']
         benitez_lopez2019_ext = config['indiv_data_paths']['benitez_lopez2019_extended']
+
+        benitez_lopez2019_rec = config['indiv_data_paths']['benitez_lopez2019_recreated']
         
         ben_lop_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019)
         fer_ari_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024)
         fer_ari_ext_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, ferreiro_arias2024_ext)
         ben_lop_ext_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019_ext)
+        ben_lop_rec_path = os.path.join(gdrive_fp, LIFE_fp, dataset_fp, benitez_lopez2019_rec)
     else:
         ben_lop_path = config['remote_machine_paths']['benitez_lopez2019']
         fer_ari_path = config['remote_machine_paths']['ferreiro_arias2024']
@@ -65,6 +68,8 @@ def read_data(args):
         data = data.drop(columns = ['IUCN_Category', 'Habitat_Density'])
     elif args.dataset == 'mammals':
         data = read_csv_non_utf(ben_lop_path)
+    elif args.dataset == 'mammals_recreated':
+        data = pd.read_csv(ben_lop_rec_path)
     elif args.dataset == 'mammals_extended':
         data = pd.read_csv(ben_lop_ext_path)
 
@@ -244,7 +249,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         elif args.dataset == 'birds':
             zero_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting', 'FoodBiomass', 'Forest_cover', 'NPP', 
                             'Body_Mass', 'Reserve']
-        elif args.dataset in ['birds_extended', 'mammals_extended']:
+        elif args.dataset in ['birds_extended', 'mammals_extended', 'mammals_recreated']:
             zero_columns = None # just using defaults here, which is all available predictors...
         nonzero_columns = zero_columns
         indicator_columns = []
@@ -492,13 +497,17 @@ if __name__ == '__main__':
 
     # DATASET PARAMS
     parser.add_argument('--gdrive', type = int, default = 1)
-    parser.add_argument('--dataset', type = str, default = 'birds', choices = ['mammals', 'birds', 'birds_extended', 'mammals_extended', 'both'])
+    parser.add_argument('--dataset', type = str, default = 'birds', choices = ['mammals', 'birds', 'birds_extended', 
+                                                                               'mammals_extended', 'mammals_recreated', 
+                                                                               'both'])
     parser.add_argument('--rebalance_dataset', type = int, default = 0)
     parser.add_argument('--tune_thresh', type = int, default = 1)
     parser.add_argument('--outlier_cutoff', type = float, default = 1000)
 
     # MODEL PARAMS
-    parser.add_argument('--model_to_use', type = str, default = 'FLAML_hurdle', choices = ['pymer', 'sklearn', 'FLAML_hurdle', 'FLAML_regression', 'FLAML_classification', 'dummy_regressor'])
+    parser.add_argument('--model_to_use', type = str, default = 'FLAML_hurdle', choices = ['pymer', 'sklearn', 'FLAML_hurdle', 
+                                                                                           'FLAML_regression', 'FLAML_classification', 
+                                                                                           'dummy_regressor'])
     parser.add_argument('--vals_to_save', type = str, nargs = '*', default = ['metrics'], choices = ['metrics', 'raw'])
 
     # CROSS-VALIDATION PARAMS
