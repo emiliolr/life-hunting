@@ -394,6 +394,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
                     'Dist_Settlement_KM', 'Travel_Time_Small', 'Travel_Time_Large',
                     'Livestock_Biomass', 'Population_Density', 'Forest_Cover', 'NPP', 
                     'Protected_Area', 'Year']
+        # all_cols = ['BM', 'DistKm', 'PopDens', 'Stunting_Pct', 'TravTime', 
+        #             'Livestock_Biomass', 'Literacy_Rate', 'Protected_Area']
         if nonzero_columns is None:
             nonzero_columns = all_cols
         if zero_columns is None:
@@ -567,6 +569,9 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         continuous_columns = ['Body_Mass', 'GDP_Per_Capita', 'Stunting_Pct', 'Literacy_Rate',
                               'Dist_Settlement_KM', 'Travel_Time_Small', 'Travel_Time_Large',
                               'Livestock_Biomass', 'Population_Density', 'Forest_Cover', 'NPP']
+        # continuous_columns = ['Body_Mass', 'DistKm', 'Population_Density', 'Stunting', 'Travel_Time_Large', 
+        #                       'Livestock_Biomass', 'Literacy_Rate']
+        # special_columns = ['Protected_Area']
         special_columns = ['Protected_Area', 'Year']
         response_column = 'Response_Ratio'
     elif dataset == 'birds':
@@ -629,7 +634,7 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         pp_data = pp_data.sort_index()
 
     # Turning reserve into an indicator variable - not needed for bird dataset!
-    if dataset in ['mammals', 'both', 'mammals_extended'] and 'Reserve' in special_columns:
+    if dataset in ['mammals', 'both', 'mammals_extended', 'mammals_recreated'] and 'Reserve' in special_columns:
         pp_data['Reserve'] = (data['Reserve'] == 'Yes').astype(int)
 
     # Adding other special columns as is

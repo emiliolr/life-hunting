@@ -145,6 +145,9 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         elif args.dataset == 'both':
             formula_zero = 'local_extirpation ~ BM + DistKm + I(DistKm^2) + TravTime + PopDens + Stunting + Reserve + BM*DistKm + BM*TravTime + BM*Stunting + (1|Country) + (1|Species)'
             formula_nonzero = 'RR ~ BM + DistKm + I(DistKm^2) + TravTime + PopDens + I(PopDens^2) + Stunting + Reserve + BM*DistKm + BM*TravTime + BM*Stunting + (1|Country) + (1|Species)'
+        elif args.dataset == 'mammals_recreated':
+            formula_zero = 'local_extirpation ~ Body_Mass + Dist_Settlement_KM + I(Dist_Settlement_KM^2) + Population_Density + Stunting_Pct + Protected_Area + (1|Country) + (1|Species) + (1|Study)'
+            formula_nonzero = 'RR ~ Body_Mass + Dist_Settlement_KM + I(Dist_Settlement_KM^2) + Population_Density + I(Population_Density^2) + Body_Mass*Dist_Settlement_KM + (1|Country) + (1|Species) + (1|Study)'
         else:
             raise ValueError('Dataset {args.dataset} not implemented for pymer hurdle model')
 

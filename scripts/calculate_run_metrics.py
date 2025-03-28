@@ -17,7 +17,7 @@ def get_run_info_from_fname(filename):
     """
 
     # Some initial checking to remove runs which can't be parsed in the same way
-    if ('SPECIAL' in filename) or ('CLIP' in filename):
+    if ('SPECIAL' in filename) or ('CLIP' in filename) or (filename == '.DS_Store'):
         return None
 
     # Parsing the file name
@@ -52,7 +52,7 @@ def get_run_info_from_fname(filename):
     if (model_name.startswith('FLAML_classification')) or (model_name.startswith('FLAML_regression')):
         return None
 
-    if bits[i + 1] == 'extended':
+    if bits[i + 1] in ['extended', 'recreated']:
         dataset = bits[i : i + 2]
         dataset = '_'.join(dataset)
         i += 2

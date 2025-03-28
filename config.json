@@ -7,7 +7,7 @@
     "ferreiro_arias2024" : "hunting_pressure_response/ferreiro_arias2024/Bird_RR_data.csv",
     "ferreiro_arias2024_extended" : "derived_datasets/ferreiro_arias2024_extended/ferreiro_arias2024_extended.csv",
     "benitez_lopez2019_extended" : "derived_datasets/benitez_lopez2019_extended/benitez_lopez2019_extended_FINAL.csv",
-    "benitez_lopez2019_recreated" : "derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated.csv",
+    "benitez_lopez2019_recreated" : "derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_w_original.csv",
     "human_pop_density" : {
       "base_path" : "socioeconomic_predictors/human_population_density",
       "data_path" : "gpw-v4-population-density-rev11_{}_30_sec_tif/gpw_v4_population_density_rev11_{}_30_sec.tif",
