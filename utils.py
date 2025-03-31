@@ -390,12 +390,12 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     elif dataset == 'mammals_recreated':
         if indicator_columns is None:
             indicator_columns = []
-        all_cols = ['Body_Mass', 'GDP_Per_Capita', 'Stunting_Pct', 'Literacy_Rate',
-                    'Dist_Settlement_KM', 'Travel_Time_Small', 'Travel_Time_Large',
-                    'Livestock_Biomass', 'Population_Density', 'Forest_Cover', 'NPP', 
-                    'Protected_Area', 'Year']
-        # all_cols = ['BM', 'DistKm', 'PopDens', 'Stunting_Pct', 'TravTime', 
-        #             'Livestock_Biomass', 'Literacy_Rate', 'Protected_Area']
+        all_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                    'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                    'Percent_Settlement_50km', 'Protected_Area']
+        # all_cols = ['Body_Mass', 'DistKm', 'Population_Density', 'Stunting_Pct', 
+        #             'Travel_Time_Large', 'Livestock_Biomass', 'Literacy_Rate',
+        #             'Protected_Area']
         if nonzero_columns is None:
             nonzero_columns = all_cols
         if zero_columns is None:
@@ -566,13 +566,13 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         response_column = 'ratio'
     elif dataset == 'mammals_recreated':
         indicator_columns = ['Country', 'Species', 'Family', 'Order', 'Study', 'Region']
-        continuous_columns = ['Body_Mass', 'GDP_Per_Capita', 'Stunting_Pct', 'Literacy_Rate',
-                              'Dist_Settlement_KM', 'Travel_Time_Small', 'Travel_Time_Large',
-                              'Livestock_Biomass', 'Population_Density', 'Forest_Cover', 'NPP']
-        # continuous_columns = ['Body_Mass', 'DistKm', 'Population_Density', 'Stunting', 'Travel_Time_Large', 
-        #                       'Livestock_Biomass', 'Literacy_Rate']
+        continuous_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                              'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                              'Percent_Settlement_50km']
+        # continuous_columns = ['Body_Mass', 'DistKm', 'Population_Density', 'Stunting_Pct', 
+        #                       'Travel_Time_Large', 'Livestock_Biomass', 'Literacy_Rate']
         # special_columns = ['Protected_Area']
-        special_columns = ['Protected_Area', 'Year']
+        special_columns = ['Protected_Area']
         response_column = 'Response_Ratio'
     elif dataset == 'birds':
         indicator_columns = ['Study', 'Dataset', 'Order', 'Family', 'Species',
@@ -816,7 +816,7 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
     return X_train, y_train, X_test, y_test
 
 if __name__ == '__main__':
-    ben_lop_rec_path = '/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated.csv'
+    ben_lop_rec_path = '/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_w_original.csv'
     data = pd.read_csv(ben_lop_rec_path)
 
     pp_data = preprocess_data(data, include_indicators = False, include_categorical = False,
