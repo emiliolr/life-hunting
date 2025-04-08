@@ -70,6 +70,13 @@ def read_data(args):
         data = read_csv_non_utf(ben_lop_path)
     elif args.dataset == 'mammals_recreated':
         data = pd.read_csv(ben_lop_rec_path)
+
+        #  adding in extended predictors, for testing purposes
+        # ext_predictors = pd.read_csv(ben_lop_ext_path)
+        # ext_predictors['IUCN_Is_Threatened'] = ext_predictors['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
+        # ext_predictors = ext_predictors[['IUCN_Is_Threatened', 'IUCN_Is_Hunted']].copy(deep = True)
+
+        # data = pd.concat((data, ext_predictors), axis = 1)
     elif args.dataset == 'mammals_extended':
         data = pd.read_csv(ben_lop_ext_path)
 
@@ -264,7 +271,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         #  specify fitting paramaters
         zero_models_to_try = args.flaml_single_model
         if zero_models_to_try is None:
-            zero_models_to_try = ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor', 'lrl1', 'lrl2']
+            zero_models_to_try = ['rf', 'lgbm', 'xgboost']
 
         zero_settings = {
             'time_budget' : args.time_budget_mins * 60,  # in seconds
@@ -281,7 +288,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         
         nonzero_models_to_try = args.flaml_single_model
         if nonzero_models_to_try is None:
-            nonzero_models_to_try = ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor']
+            nonzero_models_to_try = ['rf', 'lgbm', 'xgboost']
 
         nonzero_settings = {
             'time_budget' : args.time_budget_mins * 60,  # in seconds
@@ -298,8 +305,11 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
 
         #  optionally, adding ability to ensemble via stacked generalization
         if args.ensemble:
-            zero_settings['ensemble'] = {'passthrough' : False, 'final_estimator' : LogisticRegression()}
-            nonzero_settings['ensemble'] = {'passthrough' : False, 'final_estimator' : LinearRegression()}
+            zero_settings['ensemble'] = {'passthrough' : False}
+            nonzero_settings['ensemble'] = {'passthrough' : True}
+
+            zero_settings['estimator_list'] = ['rf', 'xgboost']
+            nonzero_settings['estimator_list'] = ['rf', 'xgboost']
         
         #  dumping everything into the hurdle model wrapper
         data_args = {'indicator_columns' : indicator_columns,
@@ -528,7 +538,7 @@ if __name__ == '__main__':
     # NONLINEAR FLAML MODELS PARAMS
     parser.add_argument('--time_budget_mins', type = float, default = 0.1)
     parser.add_argument('--ensemble', type = int, default = 0)
-    parser.add_argument('--flaml_single_model', type = str, default = '', choices = ['rf', 'xgboost'])
+    parser.add_argument('--flaml_single_model', type = str, default = '', choices = ['rf', 'xgboost', 'lgbm'])
 
     # EMBEDDING PARAMS
     parser.add_argument('--embeddings_to_use', type = str, nargs = '*', default = [], choices = ['SatCLIP', 'BioCLIP'])

@@ -388,14 +388,11 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
             if dataset == 'both':
                 zero_columns += ['TravTime']
     elif dataset == 'mammals_recreated':
-        if indicator_columns is None:
-            indicator_columns = []
         all_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                     'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
                     'Percent_Settlement_50km', 'Protected_Area']
-        # all_cols = ['Body_Mass', 'DistKm', 'Population_Density', 'Stunting_Pct', 
-        #             'Travel_Time_Large', 'Livestock_Biomass', 'Literacy_Rate',
-        #             'Protected_Area']
+        if indicator_columns is None:
+            indicator_columns = ['Country', 'Species', 'Study']
         if nonzero_columns is None:
             nonzero_columns = all_cols
         if zero_columns is None:
@@ -425,8 +422,6 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
                             'Reserve', 'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Pet_Trade', 
                             'IUCN_Is_Threatened', 'Habitat_Is_Dense']
     elif dataset == 'mammals_extended':
-        if indicator_columns is None:
-            indicator_columns = []
         all_cols = ['Diet', 'Body_Mass', 'Year', 'Dist_Access_Pts', 'Travel_Time', 
                     'Livestock_Biomass', 'Stunting', 'Population_Density', 'Literacy', 
                     'Forest_Cover', 'NPP', 'Reserve', 'Activity_Nocturnal', 
@@ -434,6 +429,9 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
                     'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 'IUCN_For_Medicine', 
                     'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 'IUCN_For_Wearing_Apparel', 
                     'IUCN_Is_Threatened']
+
+        if indicator_columns is None:
+            indicator_columns = []
         if nonzero_columns is None:
             nonzero_columns = all_cols
         if zero_columns is None:
@@ -485,12 +483,12 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
             assert dataset in ['mammals', 'birds', 'mammals_extended', 'birds_extended', 'mammals_recreated'], 'Oversampling of minority class only supported for mammals and birds datasets'
 
             #  defining all candidate columns which are categorical over the different datasets
-            all_cat_cols = ['Country', 'Species', 'Study', 'Reserve']
+            all_cat_cols = ['Country', 'Species', 'Study', 'Reserve', 'Diet']
             if 'extended' in dataset:
                 all_cat_cols += ['Trophic_Niche', 'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Pet_Trade', 
                                  'IUCN_Is_Threatened', 'Habitat_Is_Dense', 'Activity_Nocturnal', 'Activity_Crepuscular', 
                                  'Activity_Diurnal', 'IUCN_For_Handicrafts', 'IUCN_For_Medicine', 'IUCN_Is_Sport_Hunted', 
-                                 'IUCN_For_Wearing_Apparel', 'Diet']
+                                 'IUCN_For_Wearing_Apparel']
             elif dataset == 'mammals_recreated':
                 all_cat_cols += ['Protected_Area']
 
@@ -569,9 +567,6 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         continuous_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                               'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
                               'Percent_Settlement_50km']
-        # continuous_columns = ['Body_Mass', 'DistKm', 'Population_Density', 'Stunting_Pct', 
-        #                       'Travel_Time_Large', 'Livestock_Biomass', 'Literacy_Rate']
-        # special_columns = ['Protected_Area']
         special_columns = ['Protected_Area']
         response_column = 'Response_Ratio'
     elif dataset == 'birds':

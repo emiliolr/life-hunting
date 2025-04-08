@@ -24,7 +24,7 @@ def get_run_info_from_fname(filename):
     bits = filename.split('_')
 
     model = bits[0]
-    assert bits[0] in ['pymer', 'FLAML', 'xgboost', 'rf', 'dummy'], f'Model "{bits[0]}" is not currently implemented in this function'
+    assert bits[0] in ['pymer', 'FLAML', 'xgboost', 'rf', 'lgbm', 'dummy'], f'Model "{bits[0]}" is not currently implemented in this function'
     
     if model == 'pymer':
         if ('rebalance' in filename) and ('tune' in filename):
@@ -36,10 +36,13 @@ def get_run_info_from_fname(filename):
         else:
             model_name = bits[0 : 4]
             i = 4
-    elif model in ['FLAML', 'xgboost', 'rf']:
-        if ('rebalance' in filename) or ('tune' in filename) or ('ensemble' in filename):
+    elif model in ['FLAML', 'xgboost', 'rf', 'lgbm']:
+        if (('rebalance' in filename) or ('tune' in filename)) and ('ensemble' not in filename):
             model_name = bits[0 : 4]
             i = 4
+        elif 'ensemble' in filename:
+            model_name = bits[0 : 5]
+            i = 5
         else:
             model_name = bits[0 : 3]
             i = 3
@@ -168,6 +171,14 @@ def metrics_to_use():
                 'name' : 'mean_absolute_percentage_error-%s',
                 'valid' : 'all'}
     metrics.append(mape_tau)
+
+    #  median absolute percentage error, excluding small values
+    med_ape_tau = {'function' : median_absolute_percent_error_tau, 
+                'kwargs' : {'tau' : 0.05},
+                'kwarg_name_fill' : 'tau',
+                'name' : 'median_absolute_percentage_error-%s',
+                'valid' : 'all'}
+    metrics.append(med_ape_tau)
     
     # DISTRIBUTIONAL:
     #  wasserstein distance for the 0-2 range
@@ -201,7 +212,7 @@ def metrics_to_use():
 def main(args):
     # Read in the raw predictions from the indicated directory
     runs_to_eval = os.listdir(args.pred_dir)
-    runs_to_eval = [r for r in runs_to_eval if ' ' not in r] # getting rid of duplicate prediction files
+    runs_to_eval = [r for r in runs_to_eval if (' ' not in r) and ('.csv' in r)] # getting rid of duplicate prediction files
 
     #  get run info and read in raw prediction dataframe
     runs_to_eval = [get_run_info_from_fname(r) for r in runs_to_eval]

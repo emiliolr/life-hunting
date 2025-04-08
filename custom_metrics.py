@@ -212,6 +212,51 @@ def mean_absolute_percent_error_tau(y_true, y_pred, tau = 0, return_pct_kept = F
     
     return mape_tau
 
+def median_absolute_percent_error_tau(y_true, y_pred, tau = 0, return_pct_kept = False, epsilon = 1e-4):
+
+    """
+    Compute a modified median absolute percent error metric, which excludes observations with
+    y_true > tau to prevent the metric from exploding.
+
+    Parameters
+    ----------
+    y_true : numpy.array
+        an array of true continuous labels
+    y_pred : numpy.array
+        an array of predicted continuous labels
+    tau : float
+        a value >0, below which observations with y_true < tau will be ignored in the calculation
+    return_pct_kept : boolean
+        should we return the percent of the original data used in the calculation?
+    epsilon : float
+        a (small) value >0, used as the denominator of the calculation to avoid dividing by zero
+
+    Returns
+    -------
+    mape_tau : float
+        the calculated mean absolute percent error using the given tau
+    pct_kept : float
+        the percent of data points kept after subsetting to the given range
+    """
+    
+    # Converting to numpy arrays
+    y_true, y_pred = np.array(y_true), np.array(y_pred)
+
+    # Filtering out observations w/true RR smaller than tau
+    bound_mask = (y_true >= tau)
+    y_true_sub = y_true[bound_mask]
+    y_pred_sub = y_pred[bound_mask]
+
+    # Calculating the MedAPE on this data subset
+    med_ape_tau = np.median(np.abs((y_pred_sub - y_true_sub)) / (np.maximum(y_true_sub, epsilon)))
+    med_ape_tau = float(med_ape_tau)
+    pct_kept = len(y_true_sub) / len(y_true)
+
+    if return_pct_kept:
+        return med_ape_tau, pct_kept
+    
+    return med_ape_tau
+
 def get_DI_cats(ratios, neighborhood = 0, numeric = False):
 
     # Setting up an empty vector to hold DI category values
