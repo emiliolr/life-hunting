@@ -21,7 +21,13 @@ def setup_and_train_model(args, data):
     # ML hurdle model, w/hyperparam tuning through FLAML
     if args.model_to_use == 'FLAML':
         #  automl params
-        base_path = os.path.join('..', 'model_saves')
+        base_path = os.path.join(args.save_fp, 'flaml_history')
+        if not os.path.exists(base_path):
+            os.mkdir(base_path)
+
+            m = args.flaml_single_model[0] if args.flaml_single_model is not None else 'FLAML'
+            zero_history_fp = f'{args.dataset}_{m}_ZERO.log'
+            nonzero_history_fp = f'{args.dataset}_{m}_NONZERO.log'
         
         zero_metric = balanced_accuracy_FLAML
         nonzero_metric = median_absolute_error_FLAML
@@ -50,7 +56,7 @@ def setup_and_train_model(args, data):
             'time_budget' : args.time_budget_mins * 60,  # in seconds
             'metric' : zero_metric,
             'task' : 'classification',
-            'log_file_name' : os.path.join(base_path, f'{args.dataset}_nonlinear_hurdle_ZERO.log'),
+            'log_file_name' : os.path.join(base_path, zero_history_fp),
             'seed' : 1693,
             'estimator_list' : zero_models_to_try,
             'early_stop' : True,
@@ -67,7 +73,7 @@ def setup_and_train_model(args, data):
             'time_budget' : args.time_budget_mins * 60,  # in seconds
             'metric' : nonzero_metric,
             'task' : 'regression',
-            'log_file_name' : os.path.join(base_path, f'{args.dataset}_nonlinear_hurdle_NONZERO.log'),
+            'log_file_name' : os.path.join(base_path, nonzero_history_fp),
             'seed' : 1693,
             'estimator_list' : nonzero_models_to_try,
             'early_stop' : True,
@@ -132,9 +138,9 @@ def setup_and_train_model(args, data):
 
         #  setting up the hurdle model
         zero_model = PymerModelWrapper(Lmer, formula = args.pymer_zero_formula, family = 'binomial', 
-                                       control_str = control_str, use_rfx = False)
+                                       control_str = control_str, use_rfx = False, reml = args.pymer_reml)
         nonzero_model = PymerModelWrapper(Lmer, formula = args.pymer_nonzero_formula, family = 'gaussian', 
-                                          control_str = control_str, use_rfx = False)
+                                          control_str = control_str, use_rfx = False, reml = args.pymer_reml)
 
         model = HurdleModelEstimator(zero_model, nonzero_model, extirp_pos = extirp_pos, 
                                      data_args = data_args, verbose = args.verbose)
@@ -192,6 +198,10 @@ def main(args):
     # Get the dataset
     data = read_data(args)
 
+    # Make sure the save directory exists
+    if not os.path.exists(args.save_fp):
+        os.mkdir(args.save_fp)
+
     # Train the model on the full dataset
     trained_model = setup_and_train_model(args, data)
 
@@ -217,7 +227,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_to_use', type = str, default = 'FLAML', choices = ['pymer', 'FLAML'])
 
     # RESULTS SAVE PARAMS
-    parser.add_argument('--save_fp', type = str, default = '../final_results')
+    parser.add_argument('--save_fp', type = str, default = '../final_models')
 
     # NONLINEAR FLAML MODELS PARAMS
     parser.add_argument('--time_budget_mins', type = float, default = 0.1)
@@ -243,6 +253,7 @@ if __name__ == '__main__':
     args.verbose = True
     args.return_model = False
     args.save_trained_model = True
+    args.pymer_reml = True # for fitting final models, always use restricted max likelihood
 
     # Train the model on the full dataset using the inputted parameters
     fp = main(args)

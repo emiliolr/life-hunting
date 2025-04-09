@@ -70,13 +70,6 @@ def read_data(args):
         data = read_csv_non_utf(ben_lop_path)
     elif args.dataset == 'mammals_recreated':
         data = pd.read_csv(ben_lop_rec_path)
-
-        #  adding in extended predictors, for testing purposes
-        # ext_predictors = pd.read_csv(ben_lop_ext_path)
-        # ext_predictors['IUCN_Is_Threatened'] = ext_predictors['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
-        # ext_predictors = ext_predictors[['IUCN_Is_Threatened', 'IUCN_Is_Hunted']].copy(deep = True)
-
-        # data = pd.concat((data, ext_predictors), axis = 1)
     elif args.dataset == 'mammals_extended':
         data = pd.read_csv(ben_lop_ext_path)
 

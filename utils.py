@@ -785,7 +785,12 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
     else:
         pp_data = data.copy(deep = True)
 
-    resp_col = 'ratio' if dataset == 'mammals' else 'RR'
+    resp_col = 'ratio' if dataset in ['mammals', 'both'] else 'RR'
+    if dataset == 'mammals_extended':
+        resp_col = 'Ratio'
+    elif dataset == 'mammals_recreated':
+        resp_col = 'Response_Ratio'
+
     pp_data['DI_cat'] = ratios_to_DI_cats(pp_data[resp_col])
     pp_data['Local_Extirpation'] = (pp_data[resp_col] == 0).astype(int)
 

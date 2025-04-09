@@ -14,18 +14,19 @@ class PymerModelWrapper:
     A wrapper class to make pymer models behave like sklearn models.
     """
 
-    def __init__(self, pymer_model, formula, family, control_str = '', use_rfx = True):
+    def __init__(self, pymer_model, formula, family, control_str = '', use_rfx = True, reml = True):
         self.model_type = pymer_model
         self.formula = formula
         self.family = family
         self.control_str = control_str
         self.use_rfx = use_rfx
+        self.reml = reml
 
     def fit(self, X, y):
         data = self.combine_X_y(X, y)
 
         self.model = self.model_type(data = data, formula = self.formula, family = self.family)
-        self.model.fit(REML = True, control = self.control_str, summarize = False)
+        self.model.fit(REML = self.reml, control = self.control_str, summarize = False)
 
     def predict(self, X):
         preds = self.model.predict(X, use_rfx = self.use_rfx, skip_data_checks = True, verify_predictions = False)
