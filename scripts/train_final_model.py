@@ -20,15 +20,16 @@ from run_cross_validation import read_data
 def setup_and_train_model(args, data):
     # ML hurdle model, w/hyperparam tuning through FLAML
     if args.model_to_use == 'FLAML':
-        #  automl params
+        #  setting up infrastructure to save FLAML logs
         base_path = os.path.join(args.save_fp, 'flaml_history')
         if not os.path.exists(base_path):
             os.mkdir(base_path)
 
-            m = args.flaml_single_model[0] if args.flaml_single_model is not None else 'FLAML'
-            zero_history_fp = f'{args.dataset}_{m}_ZERO.log'
-            nonzero_history_fp = f'{args.dataset}_{m}_NONZERO.log'
+        m = args.flaml_single_model[0] if args.flaml_single_model is not None else 'FLAML'
+        zero_history_fp = f'{args.dataset}_{m}_ZERO.log'
+        nonzero_history_fp = f'{args.dataset}_{m}_NONZERO.log'
         
+        #  FLAML objectives
         zero_metric = balanced_accuracy_FLAML
         nonzero_metric = median_absolute_error_FLAML
 
@@ -161,7 +162,7 @@ def setup_and_train_model(args, data):
 
     # Train the hurdle model
     if args.verbose:
-        print(f'Training the {args.model_to_use} hurdle model on {args.dataset}...')
+        print(f'Training the {args.model_to_use} hurdle model on {args.dataset}')
     train_model(args, model, pp_data, fit_args)
 
     return model
@@ -187,10 +188,11 @@ def save_model(args, trained_model):
     # Pickling the model and saving in the correct directory
     fp = os.path.join(args.save_fp, f'{args.model_name}.pkl')
 
-    if args.verbose:
-        print(f'Saving trained model at {args.save_fp}...')
     with open(fp, 'wb') as f:
         pickle.dump(trained_model, f)
+
+    if args.verbose:
+        print(f'Saved trained model at {args.save_fp}')
 
     return fp
 
