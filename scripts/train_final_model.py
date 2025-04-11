@@ -184,14 +184,6 @@ def train_model(args, model, pp_data, fit_args):
         if args.verbose:
             print(f'  optimal threshold was found to be {model.prob_thresh}')
 
-    # TESTING!
-    preds = model.predict(pp_data)
-    preds[preds != 0] = np.exp(preds[preds != 0])
-    preds = list(preds)
-
-    with open(os.path.join(args.save_fp, 'testing_preds.pkl'), 'wb') as f:
-        pickle.dump(preds, f)
-
 def save_model(args, trained_model):
     # Pickling the model and saving in the correct directory
     fp = os.path.join(args.save_fp, f'{args.model_name}.pkl')

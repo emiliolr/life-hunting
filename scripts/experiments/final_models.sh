@@ -1,3 +1,3 @@
-# python train_final_model.py --gdrive 1 --dataset mammals_recreated --model_to_use pymer --rebalance_dataset 0 --tune_thresh 1 --outlier_cutoff 5 --save_fp ../final_models
-python train_final_model.py --gdrive 1 --dataset mammals_recreated --model_to_use FLAML --flaml_single_model rf --time_budget_mins 0.1 --rebalance_dataset 1 --tune_thresh 0 --outlier_cutoff 5 --save_fp /Users/emiliolr/Desktop/testing_model_save
-# python train_final_model.py --gdrive 1 --dataset mammals_recreated --model_to_use FLAML --flaml_single_model xgboost --time_budget_mins 10 --rebalance_dataset 1 --tune_thresh 0 --outlier_cutoff 5 --save_fp ../final_models
+python train_final_model.py --gdrive 1 --dataset mammals_recreated --model_to_use pymer --rebalance_dataset 0 --tune_thresh 1 --outlier_cutoff 5 --save_fp /Users/emiliolr/Desktop/final_models
+python train_final_model.py --gdrive 1 --dataset mammals_recreated --model_to_use FLAML --flaml_single_model rf --time_budget_mins 0.01 --rebalance_dataset 1 --tune_thresh 0 --outlier_cutoff 5 --save_fp /Users/emiliolr/Desktop/final_models
+python train_final_model.py --gdrive 1 --dataset mammals_recreated --model_to_use FLAML --flaml_single_model xgboost --time_budget_mins 0.01 --rebalance_dataset 1 --tune_thresh 0 --outlier_cutoff 5 --save_fp /Users/emiliolr/Desktop/final_models
