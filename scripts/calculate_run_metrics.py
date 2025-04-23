@@ -174,7 +174,7 @@ def metrics_to_use():
 
     #  median absolute percentage error, excluding small values
     med_ape_tau = {'function' : median_absolute_percent_error_tau, 
-                'kwargs' : {'tau' : 0.05},
+                'kwargs' : {'tau' : 0, 'epsilon' : 1e-2},
                 'kwarg_name_fill' : 'tau',
                 'name' : 'median_absolute_percentage_error-%s',
                 'valid' : 'all'}
