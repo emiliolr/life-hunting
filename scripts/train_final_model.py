@@ -94,7 +94,7 @@ def setup_and_train_model(args, data):
         model = HurdleModelEstimator(zero_model, nonzero_model, extirp_pos = extirp_pos, 
                                      data_args = data_args, verbose = args.verbose)
 
-        #  cross-validation params
+        #  preprocessing + model fitting params
         fit_args = {'zero' : zero_settings, 'nonzero' : nonzero_settings}
         pp_args = {'include_indicators' : True if 'extended' in args.dataset else False,
                    'include_categorical' : False,
@@ -146,7 +146,7 @@ def setup_and_train_model(args, data):
         model = HurdleModelEstimator(zero_model, nonzero_model, extirp_pos = extirp_pos, 
                                      data_args = data_args, verbose = args.verbose)
 
-        #  cross-validation params
+        #  preprocessing + model fitting params
         fit_args = None
         pp_args = {'include_indicators' : False,
                    'include_categorical' : True,
