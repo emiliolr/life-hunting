@@ -5,6 +5,9 @@ import warnings
 
 sys.path.append('..')
 warnings.simplefilter(action = 'ignore', category = FutureWarning)
+os.environ['PYTHONWARNINGS'] = 'ignore::FutureWarning' # to be sure warnings don't pop back up in parallel processes...
+
+from joblib import Parallel, delayed
 
 import pandas as pd
 import numpy as np
@@ -15,6 +18,80 @@ from sklearn.linear_model import LinearRegression
 import rioxarray as rxr
 import xarray as xr
 import geopandas as gpd
+
+def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical_zone, mammals_data, model):
+    # Get the species' name + body mass
+    species_row = tropical_mammals[tropical_mammals['iucn_id'] == species]
+    species_bm = species_row['combine_body_mass'].iloc[0]
+
+    # Reading in the relevant AOH
+    aoh_fp = os.path.join(aoh_base_fp, f'{species}_RESIDENT.tif')
+    aoh = rxr.open_rasterio(aoh_fp)
+
+    # Clipping the predictor rasters to the bounds of the AOH
+    predictor_stack_clipped = predictor_stack.rio.clip_box(*aoh.rio.bounds())
+
+    #  making sure the predictor stack is perfectly aligned w/AOH
+    predictor_stack_clipped = predictor_stack_clipped.rio.reproject_match(aoh)
+
+    # Masking predictions outside of the AOH & tropical forest zone (the intersection of the two)
+    aoh_in_forest_zone = aoh.rio.clip(tropical_zone).fillna(0) # making sure to set NAs back to 0
+
+    #  applying to the predictor stack
+    predictor_stack_clipped = predictor_stack_clipped.where(aoh_in_forest_zone != 0)
+
+    # Calculating the area overlap of AOH & tropical forest as a percent of total AOH
+    aoh_total = float(aoh.sum())
+    aoh_in_forest = float(aoh_in_forest_zone.sum())
+    pct_overlap = (species, aoh_in_forest / aoh_total)
+
+    # Extracting the data to numpy + reshaping to get it in a "tabular" format
+    predictor_stack_np = predictor_stack_clipped.to_array().variable.values.squeeze()
+    num_y, num_x = predictor_stack_np[0].shape
+    predictors_tabular = predictor_stack_np.reshape(predictor_stack_np.shape[0], num_y * num_x).transpose()
+    # print(f'Originally {predictors_tabular.shape[0]} pixels to predict on (w/NAs)')
+
+    #  tossing nan rows, but keeping track of where they are for reshaping back to raster later
+    nan_mask = np.any(np.isnan(predictors_tabular), axis = 1)
+    predictors_tabular_no_nan = predictors_tabular[~nan_mask, : ]
+
+    # Putting data in a Pandas DataFrame so the predict function of the hurdle model can grab the right vars
+    predictors_tabular_no_nan = pd.DataFrame(predictors_tabular_no_nan, columns = list(predictor_stack_clipped.keys()))
+
+    #  adding the same (standardized) body mass value to each row
+    if model_to_use == 'pymer':
+        bm = np.log10(mammals_data['Body_Mass'])
+        bm_mean, bm_std = bm.mean(), bm.std()
+        
+        species_bm_std = (np.log10(species_bm) - bm_mean) / bm_std
+    else:
+        bm = mammals_data['Body_Mass']
+        bm_mean, bm_std = bm.mean(), bm.std()
+        
+        species_bm_std = (species_bm - bm_mean) / bm_std
+
+    predictors_tabular_no_nan['Body_Mass'] = species_bm_std
+
+    #  apply the trained hurdle model to each pixel iteratively
+    pred = model.predict(predictors_tabular_no_nan)
+    pred[pred != 0] = np.exp(pred[pred != 0]) # back-transforming log RRs
+
+    # Putting the dataset all back together in a predicted raster
+    pred_tabular = np.empty(shape = predictors_tabular.shape[0])
+    pred_tabular.fill(np.nan)
+    pred_tabular[~nan_mask] = pred # one prediction for each pixel, w/nans put back in the right place
+
+    #  reshaping back to raster format + converting back to xarray
+    pred_raster = pred_tabular.transpose().reshape(num_y, num_x)
+    pred_raster_xr = xr.zeros_like(aoh_in_forest_zone)
+    pred_raster_xr.values = np.expand_dims(pred_raster, axis = 0)
+
+    # Saving back to TIF using rasterio
+    if save_raster:
+        pred_raster_xr.rio.to_raster(os.path.join(save_dir, f'{species}_hunting_pred_{model_to_use}.tif'), dtype = 'float32')
+
+    # Returning tuples of (IUCN ID, AOH percent overlap)
+    return pct_overlap
 
 def main():
     # Reading in the predictor raster stack
@@ -81,101 +158,28 @@ def main():
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
     # iucn_ids = tropical_mammals['iucn_id']
 
-    print()
-
-    # Looping over the tropical mammal species and applying the predictive model
-    # TODO: make this parallel
-    for species in iucn_ids:
-        print(f'Working on {species}...')
-
-        # Get the species' name + body mass
-        species_row = tropical_mammals[tropical_mammals['iucn_id'] == species]
-        species_name = species_row['scientific_name'].iloc[0]
-        species_bm = species_row['combine_body_mass'].iloc[0]
-
-        # Reading in the relevant AOH
-        aoh_fp = os.path.join(aoh_base_fp, f'{species}_RESIDENT.tif')
-        aoh = rxr.open_rasterio(aoh_fp)
-
-        # Clipping the predictor rasters to the bounds of the AOH
-        predictor_stack_clipped = predictor_stack.rio.clip_box(*aoh.rio.bounds())
-
-        #  making sure the predictor stack is perfectly aligned w/AOH
-        predictor_stack_clipped = predictor_stack_clipped.rio.reproject_match(aoh)
-
-        # Masking predictions outside of the AOH & tropical forest zone (the intersection of the two)
-        aoh_in_forest_zone = aoh.rio.clip(tropical_zone).fillna(0) # making sure to set NAs back to 0
-
-        # initial_num_pixels = int(aoh.where(aoh != 0).count())
-        # new_num_pixels = int(aoh_in_forest_zone.where(aoh_in_forest_zone != 0).count())
-        # print(f'{initial_num_pixels - new_num_pixels} pixels dropped (in AOH, but outside of tropical forest zone)')
-
-        #  TODO: calculate the area overlap of AOH/tropical forest as a pct of total AOH
-
-        #  applying to the predictor stack
-        predictor_stack_clipped = predictor_stack_clipped.where(aoh_in_forest_zone != 0)
-
-        # Extracting the data to numpy + reshaping to get it in a "tabular" format
-        predictor_stack_np = predictor_stack_clipped.to_array().variable.values.squeeze()
-        num_y, num_x = predictor_stack_np[0].shape
-        predictors_tabular = predictor_stack_np.reshape(predictor_stack_np.shape[0], num_y * num_x).transpose()
-        # print(f'Originally {predictors_tabular.shape[0]} pixels to predict on (w/NAs)')
-
-        #  tossing nan rows, but keeping track of where they are for reshaping back to raster later
-        nan_mask = np.any(np.isnan(predictors_tabular), axis = 1)
-        predictors_tabular_no_nan = predictors_tabular[~nan_mask, : ]
-
-        # pixels_left = predictors_tabular_no_nan.shape[0]
-        # print(f'Now only {pixels_left} pixels to predict on (removing all NAs)')
-
-        #  checking if we drop any pixels within the AOH
-        # if pixels_left < new_num_pixels:
-        #     print()
-        #     print(f'DROPPED {int(new_num_pixels - pixels_left)} PIXELS!')
-
-        # Putting data in a Pandas DataFrame so the predict function of the hurdle model can grab the right vars
-        predictors_tabular_no_nan = pd.DataFrame(predictors_tabular_no_nan, columns = list(predictor_stack_clipped.keys()))
-
-        #  adding the same (standardized) body mass value to each row
-        if model_to_use == 'pymer':
-            bm = np.log10(mammals_data['Body_Mass'])
-            bm_mean, bm_std = bm.mean(), bm.std()
-            
-            species_bm_std = (np.log10(species_bm) - bm_mean) / bm_std
-        else:
-            bm = mammals_data['Body_Mass']
-            bm_mean, bm_std = bm.mean(), bm.std()
-            
-            species_bm_std = (species_bm - bm_mean) / bm_std
-
-        predictors_tabular_no_nan['Body_Mass'] = species_bm_std
-
-        #  apply the trained hurdle model to each pixel iteratively
-        pred = model.predict(predictors_tabular_no_nan)
-        pred[pred != 0] = np.exp(pred[pred != 0]) # back-transforming log RRs
-
-        # Putting the dataset all back together in a predicted raster
-        pred_tabular = np.empty(shape = predictors_tabular.shape[0])
-        pred_tabular.fill(np.nan)
-        pred_tabular[~nan_mask] = pred # one prediction for each pixel, w/nans put back in the right place
-
-        #  reshaping back to raster format + converting back to xarray
-        pred_raster = pred_tabular.transpose().reshape(num_y, num_x)
-        pred_raster_xr = xr.zeros_like(aoh_in_forest_zone)
-        pred_raster_xr.values = np.expand_dims(pred_raster, axis = 0)
-
-        # Saving back to TIF using rasterio
-        if save_raster:
-            # species_name = species_name.replace(' ', '_')
-            pred_raster_xr.rio.to_raster(os.path.join(save_dir, f'{species}_hunting_pred_{model_to_use}.tif'), dtype = 'float32')
+    # Looping over the tropical mammal species and applying the predictive model IN PARALLEL
+    aoh_pct_overlap = Parallel(n_jobs = num_cores)(delayed(apply_model_one_species)(species, 
+                                                                                    tropical_mammals, 
+                                                                                    predictor_stack, 
+                                                                                    tropical_zone, 
+                                                                                    mammals_data, 
+                                                                                    model) for species in iucn_ids)
+    
+    # Adding the percent overlap stats to the tropical mammal dataset + saving
+    aoh_pct_overlap = pd.DataFrame(aoh_pct_overlap, columns = ['iucn_id', 'aoh_pct_overlap'])
+    aoh_pct_overlap = tropical_mammals[['iucn_id']].merge(aoh_pct_overlap, on = 'iucn_id', how = 'left')
+    aoh_pct_overlap.to_csv(os.path.join(save_dir, 'tropical_mammals_aoh_overlap.csv'), index = False)
 
 if __name__ == '__main__':
     # Parameters
     model_to_use = 'pymer' # "pymer" or "rf" or "xgboost"
     save_raster = True
 
+    num_cores = 4
+
     #  iucn IDs, for initial testing
-    iucn_ids = [181007989, 181008073, 7140]
+    iucn_ids = [181007989, 181008073, 7140, 199835]
 
     #  file paths
     life_gdrive_fp = '/Users/emiliolr/Google Drive/My Drive/LIFE/'
