@@ -6,7 +6,8 @@ import json
 
 sys.path.append('..')
 warnings.simplefilter(action = 'ignore', category = FutureWarning)
-os.environ['PYTHONWARNINGS'] = 'ignore::FutureWarning' # to be sure warnings don't pop back up in parallel processes...
+warnings.simplefilter(action = 'ignore', category = UserWarning)
+os.environ['PYTHONWARNINGS'] = 'ignore::FutureWarning,ignore::UserWarning' # to be sure warnings don't pop back up in parallel processes...
 
 from joblib import Parallel, delayed
 
@@ -185,13 +186,19 @@ def main(params, mode):
                  'pymer' : 'pymer_hurdle.pkl'}
     model_fp = os.path.join(model_dir, model_fps[model_to_use])
     
-    with warnings.catch_warnings(action = 'ignore'):
-        with open(model_fp, 'rb') as f:
-            model = pickle.load(f)
+    # with warnings.catch_warnings(action = 'ignore'):
+    with open(model_fp, 'rb') as f:
+        model = pickle.load(f)
 
     # Reading in the tropical mammal body mass data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
-    iucn_ids = tropical_mammals['iucn_id'] if len(iucn_ids) == 0 else iucn_ids
+
+    #  grabbing the subset of IDs to run over
+    if isinstance(iucn_ids, list):
+        if len(iucn_ids) == 0:
+            iucn_ids = tropical_mammals['iucn_id'].to_list()
+    elif isinstance(iucn_ids, int):
+        iucn_ids = tropical_mammals['iucn_id'].iloc[ : iucn_ids].to_list()
 
     # Looping over the tropical mammal species and applying the predictive model IN PARALLEL
     print('Making hunting predictions')
