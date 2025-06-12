@@ -184,9 +184,10 @@ def main(params, mode):
                  'xgboost' : 'xgboost_hurdle_10.0mins.pkl',
                  'pymer' : 'pymer_hurdle.pkl'}
     model_fp = os.path.join(model_dir, model_fps[model_to_use])
-
-    with open(model_fp, 'rb') as f:
-        model = pickle.load(f)
+    
+    with warnings.catch_warnings(action = 'ignore'):
+        with open(model_fp, 'rb') as f:
+            model = pickle.load(f)
 
     # Reading in the tropical mammal body mass data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
@@ -216,7 +217,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'local'
+    mode = 'remote'
     print(f'Running in {mode} mode\n')
 
     #  running the projection procedure over the tropical mammal IUCN IDs

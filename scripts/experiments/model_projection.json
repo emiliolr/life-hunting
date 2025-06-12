@@ -1,7 +1,7 @@
 {
     "model_to_use" : "rf",
     "save_raster" : 1,
-    "num_cores" : 4,
+    "num_cores" : 8,
     "iucn_id_subset" : [181007989, 181008073, 7140, 199835],
     "filepaths" : {
         "local" : {
