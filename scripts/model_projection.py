@@ -2,6 +2,7 @@ import pickle
 import sys
 import os
 import warnings
+import json
 
 sys.path.append('..')
 warnings.simplefilter(action = 'ignore', category = FutureWarning)
@@ -19,13 +20,14 @@ import rioxarray as rxr
 import xarray as xr
 import geopandas as gpd
 
-def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical_zone, mammals_data, model):
+def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical_zone, mammals_data, model,
+                            model_to_use, aoh_dir, save_raster, save_dir):
     # Get the species' name + body mass
     species_row = tropical_mammals[tropical_mammals['iucn_id'] == species]
     species_bm = species_row['combine_body_mass'].iloc[0]
 
     # Reading in the relevant AOH
-    aoh_fp = os.path.join(aoh_base_fp, f'{species}_RESIDENT.tif')
+    aoh_fp = os.path.join(aoh_dir, f'{species}_RESIDENT.tif')
     aoh = rxr.open_rasterio(aoh_fp)
 
     # Clipping the predictor rasters to the bounds of the AOH
@@ -43,17 +45,25 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
     # Calculating the area overlap of AOH & tropical forest as a percent of total AOH
     aoh_total = float(aoh.sum())
     aoh_in_forest = float(aoh_in_forest_zone.sum())
-    pct_overlap = (species, aoh_in_forest / aoh_total)
+    pct_overlap = aoh_in_forest / aoh_total
+
+    #  skip making predictions if there's no overlap w/tropical forest
+    if pct_overlap == 0:
+        return species, pct_overlap
 
     # Extracting the data to numpy + reshaping to get it in a "tabular" format
     predictor_stack_np = predictor_stack_clipped.to_array().variable.values.squeeze()
     num_y, num_x = predictor_stack_np[0].shape
     predictors_tabular = predictor_stack_np.reshape(predictor_stack_np.shape[0], num_y * num_x).transpose()
-    # print(f'Originally {predictors_tabular.shape[0]} pixels to predict on (w/NAs)')
 
     #  tossing nan rows, but keeping track of where they are for reshaping back to raster later
     nan_mask = np.any(np.isnan(predictors_tabular), axis = 1)
     predictors_tabular_no_nan = predictors_tabular[~nan_mask, : ]
+
+    #  error handling - should only be an issue if the predictor rasters have gaps that
+    #   preclude model prediciton (or poor alignment)
+    if predictors_tabular_no_nan.shape[0] == 0:
+        return species, -1
 
     # Putting data in a Pandas DataFrame so the predict function of the hurdle model can grab the right vars
     predictors_tabular_no_nan = pd.DataFrame(predictors_tabular_no_nan, columns = list(predictor_stack_clipped.keys()))
@@ -91,9 +101,33 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
         pred_raster_xr.rio.to_raster(os.path.join(save_dir, f'{species}_hunting_pred_{model_to_use}.tif'), dtype = 'float32')
 
     # Returning tuples of (IUCN ID, AOH percent overlap)
-    return pct_overlap
+    return species, pct_overlap
 
-def main():
+def main(params, mode):
+    # Parsing parameters passed in via JSON
+    model_to_use = params['model_to_use'] 
+    save_raster = bool(params['save_raster'])
+
+    num_cores = params['num_cores']
+
+    #  a subset of iucn IDs, for testing (if empty, will loop over all IDs)
+    iucn_ids = params['iucn_id_subset']
+
+    #  file paths
+    filepaths = params['filepaths'][mode]
+    base_fp = filepaths['base_fp']
+
+    predictor_stack_fp = os.path.join(base_fp, filepaths['predictor_stack_fp'])
+    tropical_zone_fp = os.path.join(base_fp, filepaths['tropical_zone_fp'])
+    aoh_dir = filepaths['aoh_dir']
+
+    mammals_data_fp = os.path.join(base_fp, filepaths['mammals_data_fp'])
+    tropical_mammals_fp = os.path.join(base_fp, filepaths['tropical_mammals_fp'])
+
+    model_dir = os.path.join(base_fp, filepaths['model_dir'])
+
+    save_dir = filepaths['save_dir']
+
     # Reading in the predictor raster stack
     print('Reading predictor stack')
 
@@ -149,22 +183,27 @@ def main():
     model_fps = {'rf' : 'rf_hurdle_10.0mins.pkl',
                  'xgboost' : 'xgboost_hurdle_10.0mins.pkl',
                  'pymer' : 'pymer_hurdle.pkl'}
-    model_fp = os.path.join(model_base_path, model_fps[model_to_use])
+    model_fp = os.path.join(model_dir, model_fps[model_to_use])
 
     with open(model_fp, 'rb') as f:
         model = pickle.load(f)
 
     # Reading in the tropical mammal body mass data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
-    # iucn_ids = tropical_mammals['iucn_id']
+    iucn_ids = tropical_mammals['iucn_id'] if len(iucn_ids) == 0 else iucn_ids
 
     # Looping over the tropical mammal species and applying the predictive model IN PARALLEL
+    print('Making hunting predictions')
     aoh_pct_overlap = Parallel(n_jobs = num_cores)(delayed(apply_model_one_species)(species, 
                                                                                     tropical_mammals, 
                                                                                     predictor_stack, 
                                                                                     tropical_zone, 
                                                                                     mammals_data, 
-                                                                                    model) for species in iucn_ids)
+                                                                                    model,
+                                                                                    model_to_use,
+                                                                                    aoh_dir,
+                                                                                    save_raster,
+                                                                                    save_dir) for species in iucn_ids)
     
     # Adding the percent overlap stats to the tropical mammal dataset + saving
     aoh_pct_overlap = pd.DataFrame(aoh_pct_overlap, columns = ['iucn_id', 'aoh_pct_overlap'])
@@ -172,28 +211,13 @@ def main():
     aoh_pct_overlap.to_csv(os.path.join(save_dir, 'tropical_mammals_aoh_overlap.csv'), index = False)
 
 if __name__ == '__main__':
-    # Parameters
-    model_to_use = 'pymer' # "pymer" or "rf" or "xgboost"
-    save_raster = True
+    # Read in parameters
+    with open('experiments/model_projection.json', 'r') as f:
+        params = json.load(f)
 
-    num_cores = 4
-
-    #  iucn IDs, for initial testing
-    iucn_ids = [181007989, 181008073, 7140, 199835]
-
-    #  file paths
-    life_gdrive_fp = '/Users/emiliolr/Google Drive/My Drive/LIFE/'
-
-    predictor_stack_fp = os.path.join(life_gdrive_fp, 'datasets/derived_datasets/hunting_predictor_stack/hunting_predictor_stack_buffered.tif')
-    tropical_zone_fp = os.path.join(life_gdrive_fp, 'datasets/derived_datasets/tropical_forest_extent/tropical_forest_extent.shp')
-    aoh_base_fp = '/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants'
-
-    mammals_data_fp = os.path.join(life_gdrive_fp, 'datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_w_original.csv')
-    tropical_mammals_fp = os.path.join(life_gdrive_fp, 'datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv')
-
-    model_base_path = os.path.join(life_gdrive_fp, 'hunting_analysis/final_models')
-
-    save_dir = '/Users/emiliolr/Desktop/hunting_testing'
+    # Choosing either "local" or "remote"
+    mode = 'local'
+    print(f'Running in {mode} mode\n')
 
     #  running the projection procedure over the tropical mammal IUCN IDs
-    main()
+    main(params, mode)

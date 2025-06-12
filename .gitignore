@@ -18,3 +18,4 @@
 
 *.json
 !config.json
+!model_projection.json
