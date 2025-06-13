@@ -54,15 +54,20 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
 
     # Extracting the data to numpy + reshaping to get it in a "tabular" format
     predictor_stack_np = predictor_stack_clipped.to_array().variable.values.squeeze()
-    num_y, num_x = predictor_stack_np[0].shape
-    predictors_tabular = predictor_stack_np.reshape(predictor_stack_np.shape[0], num_y * num_x).transpose()
+
+    try:
+        num_y, num_x = predictor_stack_np[0].shape
+        predictors_tabular = predictor_stack_np.reshape(predictor_stack_np.shape[0], num_y * num_x).transpose()
+    except ValueError:
+        print(species)
+        raise ValueError
 
     #  tossing nan rows, but keeping track of where they are for reshaping back to raster later
     nan_mask = np.any(np.isnan(predictors_tabular), axis = 1)
     predictors_tabular_no_nan = predictors_tabular[~nan_mask, : ]
 
-    #  error handling - should only be an issue if the predictor rasters have gaps that
-    #   preclude model prediciton (or poor alignment)
+    #  error handling for no pixels to predict on - should only be an issue if the predictor 
+    #   rasters have gaps that preclude model prediction (or poor alignment)
     if predictors_tabular_no_nan.shape[0] == 0:
         return species, -1
 
@@ -186,7 +191,6 @@ def main(params, mode):
                  'pymer' : 'pymer_hurdle.pkl'}
     model_fp = os.path.join(model_dir, model_fps[model_to_use])
     
-    # with warnings.catch_warnings(action = 'ignore'):
     with open(model_fp, 'rb') as f:
         model = pickle.load(f)
 
