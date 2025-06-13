@@ -22,7 +22,7 @@ import xarray as xr
 import geopandas as gpd
 
 def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical_zone, mammals_data, model,
-                            model_to_use, aoh_dir, save_raster, save_dir):
+                            model_to_use, aoh_dir, save_raster, save_dir, error_fp):
     # Get the species' name + body mass
     species_row = tropical_mammals[tropical_mammals['iucn_id'] == species]
     species_bm = species_row['combine_body_mass'].iloc[0]
@@ -53,16 +53,17 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
         return species, pct_overlap
 
     # Extracting the data to numpy + reshaping to get it in a "tabular" format
-    predictor_stack_np = predictor_stack_clipped.to_array().variable.values.squeeze()
+    predictor_stack_np = predictor_stack_clipped.to_array().variable.values.squeeze(axis = 3)
 
-    try:
-        num_y, num_x = predictor_stack_np[0].shape
-    except:
-        with open(f'/maps/el590/{species}_ERROR.txt', 'w') as f:
-            f.write(species)
+    # try:
+    #     num_y, num_x = predictor_stack_np[0].shape
+    # except:
+    #     with open(error_fp, 'a') as f:
+    #         f.write(str(species))
 
-        raise ValueError
+    #     raise ValueError
 
+    num_y, num_x = predictor_stack_np[0].shape
     predictors_tabular = predictor_stack_np.reshape(predictor_stack_np.shape[0], num_y * num_x).transpose()
 
     #  tossing nan rows, but keeping track of where they are for reshaping back to raster later
@@ -136,6 +137,7 @@ def main(params, mode):
     model_dir = os.path.join(base_fp, filepaths['model_dir'])
 
     save_dir = filepaths['save_dir']
+    error_fp = filepaths['error_fp']
 
     # Reading in the predictor raster stack
     print('Reading predictor stack')
@@ -218,7 +220,8 @@ def main(params, mode):
                                                                                                   model_to_use,
                                                                                                   aoh_dir,
                                                                                                   save_raster,
-                                                                                                  save_dir) for species in iucn_ids)
+                                                                                                  save_dir, 
+                                                                                                  error_fp) for species in iucn_ids)
     
     # Adding the percent overlap stats to the tropical mammal dataset + saving
     aoh_pct_overlap = pd.DataFrame(aoh_pct_overlap, columns = ['iucn_id', 'aoh_pct_overlap'])
@@ -231,7 +234,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'remote'
+    mode = 'local'
     print(f'Running in {mode} mode\n')
 
     #  running the projection procedure over the tropical mammal IUCN IDs
