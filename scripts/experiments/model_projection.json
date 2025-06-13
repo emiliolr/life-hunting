@@ -1,8 +1,8 @@
 {
-    "model_to_use" : "rf",
+    "model_to_use" : "pymer",
     "save_raster" : 1,
-    "num_cores" : 2,
-    "iucn_id_subset" : [7140, 199835, 181007989, 181008073],
+    "num_cores" : 128,
+    "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {
             "base_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE",
