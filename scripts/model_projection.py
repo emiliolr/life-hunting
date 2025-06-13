@@ -38,7 +38,13 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
     predictor_stack_clipped = predictor_stack_clipped.rio.reproject_match(aoh)
 
     # Masking predictions outside of the AOH & tropical forest zone (the intersection of the two)
-    aoh_in_forest_zone = aoh.rio.clip(tropical_zone).fillna(0) # making sure to set NAs back to 0
+    try:
+        aoh_in_forest_zone = aoh.rio.clip(tropical_zone).fillna(0) # making sure to set NAs back to 0
+    except:
+        with open(error_fp, 'a') as f:
+            f.write(str(species))
+
+        raise ValueError
 
     #  applying to the predictor stack
     predictor_stack_clipped = predictor_stack_clipped.where(aoh_in_forest_zone != 0)
@@ -54,14 +60,6 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
 
     # Extracting the data to numpy + reshaping to get it in a "tabular" format
     predictor_stack_np = predictor_stack_clipped.to_array().variable.values.squeeze(axis = 3)
-
-    # try:
-    #     num_y, num_x = predictor_stack_np[0].shape
-    # except:
-    #     with open(error_fp, 'a') as f:
-    #         f.write(str(species))
-
-    #     raise ValueError
 
     num_y, num_x = predictor_stack_np[0].shape
     predictors_tabular = predictor_stack_np.reshape(predictor_stack_np.shape[0], num_y * num_x).transpose()
