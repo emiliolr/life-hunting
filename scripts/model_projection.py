@@ -39,7 +39,7 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
 
     # Masking predictions outside of the AOH & tropical forest zone (the intersection of the two)
     try:
-        aoh_in_forest_zone = aoh.rio.clip(tropical_zone).fillna(0) # making sure to set NAs back to 0
+        aoh_in_forest_zone = aoh.rio.clip(tropical_zone, all_touched = True).fillna(0) # making sure to set NAs back to 0
     except:
         with open(error_fp, 'a') as f:
             f.write(str(species))
@@ -232,7 +232,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'local'
+    mode = 'remote'
     print(f'Running in {mode} mode\n')
 
     #  running the projection procedure over the tropical mammal IUCN IDs
