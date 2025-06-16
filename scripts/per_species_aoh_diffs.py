@@ -1,6 +1,7 @@
 import sys
 import os
 import warnings
+import json
 
 sys.path.append('..')
 warnings.simplefilter(action = 'ignore', category = FutureWarning)
@@ -56,7 +57,21 @@ def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir,
 
     return return_dict
 
-def main(tropical_mammals_fp, hunting_preds_dir, current_aoh_dir, human_absent_aoh_dir, iucn_ids, model_to_use):
+def main(params, mode):
+    # Parsing parameters passed in via JSON
+    model_to_use = params['model_to_use']
+    iucn_ids = params['iucn_id_subset']
+    num_cores = params['num_cores']
+
+    #  file paths
+    filepaths = params['filepaths'][mode]
+
+    tropical_mammals_fp = filepaths['tropical_mammals_fp']
+
+    hunting_preds_dir = filepaths['hunting_preds_dir']
+    current_aoh_dir = filepaths['current_aoh_dir']
+    human_absent_aoh_dir = filepaths['human_absent_aoh_dir']
+
     # Reading in the tropical mammal body mass data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
 
@@ -80,28 +95,27 @@ def main(tropical_mammals_fp, hunting_preds_dir, current_aoh_dir, human_absent_a
             filtered_iucn_ids.append(sp)
 
     # Collecting AOH info for each species in parallel:
-    #  1. Human-absent AOH
-    #  2. Current AOH (human-absent + habitat loss)
-    #  3. Human-absent AOH + hunting
+    #  1. Human-absent AOH,
+    #  2. Current AOH (human-absent + habitat loss),
+    #  3. Human-absent AOH + hunting, and
     #  4. Current AOH + hunting
-    aoh_info_df = pd.DataFrame(columns = ['species', 'human_absent_aoh_total', 'current_aoh_total',
-                                          'human_absent_aoh_w_hunting_total', 'current_aoh_w_hunting_total'])
-
-    for i, sp in enumerate(filtered_iucn_ids):
-        row = collect_aoh_info_one_species(sp, current_aoh_dir, human_absent_aoh_dir, hunting_preds_dir, model_to_use)
-        aoh_info_df.loc[i] = row
+    aoh_dicts = Parallel(n_jobs = num_cores, verbose = 10)(delayed(collect_aoh_info_one_species)(sp, 
+                                                                                                 current_aoh_dir, 
+                                                                                                 human_absent_aoh_dir, 
+                                                                                                 hunting_preds_dir, 
+                                                                                                 model_to_use) for sp in filtered_iucn_ids)
 
     # Saving the data frame containing different bits of AOH info
+    aoh_info_df = pd.DataFrame(aoh_dicts)
     aoh_info_df.to_csv(os.path.join(hunting_preds_dir, 'effective_aoh_info.csv'), index = False)
 
 if __name__ == '__main__':
-    tropical_mammals_fp = '/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv'
-    iucn_ids = [7140, 181007989, 181008073]
-    
-    model_to_use = 'pymer'
+    # Read in parameters
+    with open('experiments/per_species_aoh_diffs.json', 'r') as f:
+        params = json.load(f)
 
-    hunting_preds_dir = '/Users/emiliolr/Desktop/hunting_testing'
-    current_aoh_dir = '/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants'
-    human_absent_aoh_dir = '/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants/human_absent'
+    # Choosing either "local" or "remote"
+    mode = 'remote'
+    print(f'Running in {mode} mode\n')
 
-    main(tropical_mammals_fp, hunting_preds_dir, current_aoh_dir, human_absent_aoh_dir, iucn_ids, model_to_use)
+    main(params, mode)
