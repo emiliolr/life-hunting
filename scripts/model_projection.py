@@ -118,6 +118,8 @@ def main(params, mode):
 
     num_cores = params['num_cores']
 
+    current_aoh = params['current_aoh']
+
     #  a subset of iucn IDs, for testing (if empty, will loop over all IDs)
     iucn_ids = params['iucn_id_subset']
 
@@ -127,15 +129,21 @@ def main(params, mode):
 
     predictor_stack_fp = os.path.join(base_fp, filepaths['predictor_stack_fp'])
     tropical_zone_fp = os.path.join(base_fp, filepaths['tropical_zone_fp'])
-    aoh_dir = filepaths['aoh_dir']
 
     mammals_data_fp = os.path.join(base_fp, filepaths['mammals_data_fp'])
     tropical_mammals_fp = os.path.join(base_fp, filepaths['tropical_mammals_fp'])
 
     model_dir = os.path.join(base_fp, filepaths['model_dir'])
 
-    save_dir = filepaths['save_dir']
     error_fp = filepaths['error_fp']
+
+    #  either applying to current AOHs or human-absent
+    if current_aoh:
+        aoh_dir = filepaths['current_aoh_dir']
+        save_dir = os.path.join(filepaths['save_dir'], 'current')
+    else:
+        aoh_dir = filepaths['human_absent_aoh_dir']
+        save_dir = os.path.join(filepaths['save_dir'], 'human_absent')
 
     # Reading in the predictor raster stack
     print('Reading predictor stack')

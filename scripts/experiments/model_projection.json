@@ -2,6 +2,7 @@
     "model_to_use" : "pymer",
     "save_raster" : 1,
     "num_cores" : 128,
+    "current_aoh" : 1,
     "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {
@@ -19,7 +20,8 @@
             "base_fp" : "/maps/el590",
             "predictor_stack_fp" : "hunting_predictor_stack/hunting_predictor_stack_buffered.tif",
             "tropical_zone_fp" : "tropical_forest_extent/tropical_forest_extent.shp",
-            "aoh_dir" : "/maps/mwd24/life-v1/aohs/current/MAMMALIA",
+            "current_aoh_dir" : "/maps/mwd24/life-v1/aohs/current/MAMMALIA",
+            "human_absent_aoh_dir" : "/maps/mwd24/life-v1/aohs/pnv/MAMMALIA",
             "mammals_data_fp" : "benitez_lopez2019_recreated/benitez_lopez2019_recreated_w_original.csv",
             "tropical_mammals_fp" : "tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv",
             "model_dir" : "final_models",
