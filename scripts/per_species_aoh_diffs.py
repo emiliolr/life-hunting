@@ -107,7 +107,7 @@ def main(params, mode):
 
     # Saving the data frame containing different bits of AOH info
     aoh_info_df = pd.DataFrame(aoh_dicts)
-    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, 'effective_aoh_info.csv'), index = False)
+    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}.csv'), index = False)
 
 if __name__ == '__main__':
     # Read in parameters

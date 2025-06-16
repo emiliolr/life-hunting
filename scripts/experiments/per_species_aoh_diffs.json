@@ -1,7 +1,7 @@
 {
-    "model_to_use" : "pymer",
-    "num_cores" : 64,
-    "iucn_id_subset" : [7140, 181007989, 181008073],
+    "model_to_use" : "rf",
+    "num_cores" : 128,
+    "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {
             "current_aoh_dir" : "/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants",
