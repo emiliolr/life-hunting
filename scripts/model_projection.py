@@ -38,13 +38,7 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
     predictor_stack_clipped = predictor_stack_clipped.rio.reproject_match(aoh)
 
     # Masking predictions outside of the AOH & tropical forest zone (the intersection of the two)
-    try:
-        aoh_in_forest_zone = aoh.rio.clip(tropical_zone, all_touched = True).fillna(0) # making sure to set NAs back to 0
-    except:
-        with open(error_fp, 'a') as f:
-            f.write(str(species))
-
-        raise ValueError
+    aoh_in_forest_zone = aoh.rio.clip(tropical_zone, all_touched = True).fillna(0) # making sure to set NAs back to 0
 
     #  applying to the predictor stack
     predictor_stack_clipped = predictor_stack_clipped.where(aoh_in_forest_zone != 0)
@@ -52,6 +46,11 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
     # Calculating the area overlap of AOH & tropical forest as a percent of total AOH
     aoh_total = float(aoh.sum())
     aoh_in_forest = float(aoh_in_forest_zone.sum())
+
+    #  handling the case where there's no AOH at all...
+    if aoh_total == 0:
+        return species, -2 
+
     pct_overlap = aoh_in_forest / aoh_total
 
     #  skip making predictions if there's no overlap w/tropical forest

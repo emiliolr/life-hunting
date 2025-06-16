@@ -1,8 +1,8 @@
 {
-    "model_to_use" : "pymer",
+    "model_to_use" : "rf",
     "save_raster" : 1,
     "num_cores" : 128,
-    "current_aoh" : 1,
+    "current_aoh" : 0,
     "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {
