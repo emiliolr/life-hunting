@@ -5,6 +5,7 @@
 *.pkl
 *.log
 *.csv
+*.out
 
 *.pdf
 !MRes_Project_Report.pdf
