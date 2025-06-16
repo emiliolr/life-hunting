@@ -20,3 +20,4 @@
 *.json
 !config.json
 !model_projection.json
+!per_species_aoh_diffs.json
