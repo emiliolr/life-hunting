@@ -18,6 +18,8 @@
 !requirements.txt
 
 *.json
-!config.json
-!model_projection.json
-!per_species_aoh_diffs.json
+
+# !config.json
+# !model_projection.json
+# !per_species_aoh_diffs.json
+!/scripts/experiments/*
