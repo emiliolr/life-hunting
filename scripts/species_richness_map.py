@@ -1,6 +1,6 @@
 import sys
 import os
-import warnings
+# import warnings
 import json
 import time
 
@@ -12,10 +12,11 @@ sys.path.append('..')
 # from joblib import Parallel, delayed
 
 import pandas as pd
-import numpy as np
+# import numpy as np
 
 import rioxarray as rxr
-import xarray as xr
+# import xarray as xr
+import geopandas as gpd
 
 def main(params, mode):
     # Parsing parameters passed in via JSON
@@ -26,6 +27,7 @@ def main(params, mode):
 
     tropical_mammals_fp = filepaths['tropical_mammals_fp']
     template_raster_fp = filepaths['template_raster_fp']
+    tropical_zone_fp = filepaths['tropical_zone_fp']
     aoh_dir = filepaths['aoh_dir']
 
     save_fp = filepaths['save_fp']
@@ -57,8 +59,13 @@ def main(params, mode):
 
     print(f'Processing time: {time.time() - start}')
 
+    # Cropping the aggregated richness map to the forest zone polygon boundaries
+    tropical_zone = gpd.read_file(tropical_zone_fp)
+    tropical_zone = [tropical_zone.geometry.iloc[0]]
+    species_richness = template_raster.rio.clip(tropical_zone, all_touched = True).fillna(0)
+
     # Saving the final species richness raster
-    template_raster.rio.to_raster(save_fp, dtype = 'uint16')
+    species_richness.rio.to_raster(save_fp, dtype = 'uint16')
 
 if __name__ == '__main__':
     # Read in parameters
@@ -66,7 +73,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'remote'
-    print(f'Running in {mode} mode')
+    mode = 'local'
+    print(f'Running in {mode} mode\n')
 
     main(params, mode)
