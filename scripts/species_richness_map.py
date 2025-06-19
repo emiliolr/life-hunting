@@ -2,6 +2,7 @@ import sys
 import os
 import warnings
 import json
+import time
 
 sys.path.append('..')
 # warnings.simplefilter(action = 'ignore', category = FutureWarning)
@@ -44,12 +45,17 @@ def main(params, mode):
 
     # Iteratively reading in the AOHs for tropical mammals + recording where they fall w/in the
     #  tropical forest zone
+    print(f'Aggregating across {len(iucn_ids)} species')
+    start = time.time()
+
     for sp in iucn_ids:
         aoh = rxr.open_rasterio(os.path.join(aoh_dir, f'{sp}_RESIDENT.tif'))
         aoh = aoh.rio.reproject_match(template_raster).fillna(0) # reproject to match template exactly
         aoh = (aoh > 0).astype(int) # turn into a binary AOH map
 
         template_raster = template_raster + aoh # add to running species richness map
+
+    print(f'Processing time: {time.time() - start}')
 
     # Saving the final species richness raster
     template_raster.rio.to_raster(save_fp, dtype = 'uint16')
@@ -60,7 +66,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'local'
+    mode = 'remote'
     print(f'Running in {mode} mode')
 
     main(params, mode)

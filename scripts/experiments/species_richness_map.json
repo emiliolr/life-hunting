@@ -1,5 +1,5 @@
 {
-    "iucn_id_subset" : [10122, 101228458, 10125, 10126, 10130, 10132, 10133, 10134, 10137, 10140, 10141],
+    "iucn_id_subset" : 150,
     "filepaths" : {
         "local" : {
             "aoh_dir" : "/Users/emiliolr/Desktop/problem_chunk",
