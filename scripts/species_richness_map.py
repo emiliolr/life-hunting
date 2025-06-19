@@ -1,39 +1,17 @@
 import sys
 import os
-import shutil
 import json
 import time
 
 sys.path.append('..')
 
-from joblib import Parallel, delayed
-
 import pandas as pd
-import numpy as np
-
 import rioxarray as rxr
 import geopandas as gpd
-
-def process_one_species_chunk(species_chunk, chunk_num, template_raster, aoh_dir, cache_dir):
-    # Make a deep copy of the template for this chunk's species richness map
-    spp_richness = template_raster.copy(deep = True)
-
-    # Run across all species in the chunk
-    for sp in species_chunk:
-        aoh = rxr.open_rasterio(os.path.join(aoh_dir, f'{sp}_RESIDENT.tif'))
-        aoh = aoh.rio.reproject_match(spp_richness).fillna(0) # reproject to match template exactly
-        aoh = (aoh > 0).astype(int) # turn into a binary AOH map
-
-        spp_richness = spp_richness + aoh # add to running species richness map
-    
-    # Save species richness sub-raster for this chunk
-    spp_richness.rio.to_raster(os.path.join(cache_dir, f'{chunk_num}_species_richness.tif'))
 
 def main(params, mode):
     # Parsing parameters passed in via JSON
     iucn_ids = params['iucn_id_subset']
-    num_chunks = params['num_chunks']
-    num_cores = params['num_cores']
 
     #  file paths
     filepaths = params['filepaths'][mode]
@@ -55,35 +33,22 @@ def main(params, mode):
     elif isinstance(iucn_ids, int):
         iucn_ids = tropical_mammals['iucn_id'].iloc[ : iucn_ids].to_list()
 
-    # Chunking species into groups for parallel processing
-    species_chunks = np.array_split(np.array(iucn_ids), indices_or_sections = num_chunks)
-
     # Reading in the template raster (extent of tropical forest zone, resolution + projection of AOHs)
     template_raster = rxr.open_rasterio(template_raster_fp)
 
-    # Creating the directory for the chunk intermediate cache
-    cache_dir = os.path.join(os.path.dirname(save_fp), 'species_richness_cache')
-
-    if os.path.exists(cache_dir):
-        shutil.rmtree(cache_dir)
-    os.mkdir(cache_dir)
-
-    # Process the species chunks in parallel
+    # Iteratively reading in the AOHs for tropical mammals + recording where they fall w/in the
+    #  tropical forest zone
     print(f'Aggregating across {len(iucn_ids)} species')
     start = time.time()
 
-    Parallel(n_jobs = num_cores, verbose = 10)(delayed(process_one_species_chunk)(species_chunk, i, template_raster, 
-                                                                                  aoh_dir, cache_dir) for i, species_chunk in enumerate(species_chunks))
+    for sp in iucn_ids:
+        aoh = rxr.open_rasterio(os.path.join(aoh_dir, f'{sp}_RESIDENT.tif'))
+        aoh = aoh.rio.reproject_match(template_raster).fillna(0) # reproject to match template exactly
+        aoh = (aoh > 0).astype(int) # turn into a binary AOH map
 
-    # Aggregating all sub-rasters from chunks
-    for i, _ in enumerate(species_chunks):
-        spp_richness = rxr.open_rasterio(os.path.join(cache_dir, f'{i}_species_richness.tif'))
-        template_raster = template_raster + spp_richness
+        template_raster = template_raster + aoh # add to running species richness map
 
     print(f'Processing time: {time.time() - start}')
-
-    #  cleanup: removing the cache directory
-    shutil.rmtree(cache_dir)
 
     # Cropping the aggregated richness map to the forest zone polygon boundaries
     tropical_zone = gpd.read_file(tropical_zone_fp)
@@ -99,7 +64,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'remote'
+    mode = 'local'
     print(f'Running in {mode} mode\n')
 
     main(params, mode)

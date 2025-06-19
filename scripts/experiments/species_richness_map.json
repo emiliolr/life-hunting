@@ -1,7 +1,5 @@
 {
     "iucn_id_subset" : [],
-    "num_chunks" : 300,
-    "num_cores" : 32,
     "filepaths" : {
         "local" : {
             "aoh_dir" : "/Users/emiliolr/Desktop/problem_chunk",
