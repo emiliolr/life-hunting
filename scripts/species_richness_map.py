@@ -74,12 +74,13 @@ def main(params, mode):
 
     Parallel(n_jobs = num_cores, verbose = 10)(delayed(process_one_species_chunk)(species_chunk, i, template_raster, 
                                                                                   aoh_dir, cache_dir) for i, species_chunk in enumerate(species_chunks))
-    print(f'Processing time: {time.time() - start}')
 
     # Aggregating all sub-rasters from chunks
     for i, _ in enumerate(species_chunks):
         spp_richness = rxr.open_rasterio(os.path.join(cache_dir, f'{i}_species_richness.tif'))
         template_raster = template_raster + spp_richness
+
+    print(f'Processing time: {time.time() - start}')
 
     #  cleanup: removing the cache directory
     shutil.rmtree(cache_dir)
