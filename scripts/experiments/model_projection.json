@@ -1,15 +1,15 @@
 {
-    "model_to_use" : "rf",
+    "model_to_use" : "pymer",
     "save_raster" : 1,
-    "num_cores" : 128,
-    "current_aoh" : 0,
-    "iucn_id_subset" : [],
+    "num_cores" : 4,
+    "current_aoh" : 1,
+    "iucn_id_subset" : [10122, 101228458, 10125, 10126, 10130, 10132, 10133, 10134, 10137, 10140, 10141],
     "filepaths" : {
         "local" : {
             "base_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE",
             "predictor_stack_fp" : "datasets/derived_datasets/hunting_predictor_stack/hunting_predictor_stack_buffered.tif",
             "tropical_zone_fp" : "datasets/derived_datasets/tropical_forest_extent/tropical_forest_extent.shp",
-            "current_aoh_dir" : "/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants",
+            "current_aoh_dir" : "/Users/emiliolr/Desktop/problem_chunk",
             "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants/human_absent",
             "mammals_data_fp" : "datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_w_original.csv",
             "tropical_mammals_fp" : "datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv",
