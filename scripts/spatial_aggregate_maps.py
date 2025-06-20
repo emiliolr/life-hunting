@@ -41,14 +41,24 @@ def main(params, mode):
     elif isinstance(iucn_ids, int):
         iucn_ids = tropical_mammals['iucn_id'].iloc[ : iucn_ids].to_list()
 
+    # Reading in the AOH percent overlap file to filter out species
+    aoh_overlap_current = pd.read_csv(os.path.join(hunting_preds_dir, 'current', 'tropical_mammals_aoh_overlap.csv'))
+
+    filtered_iucn_ids = []
+    for sp in iucn_ids:
+        pct_overlap_current = aoh_overlap_current.loc[aoh_overlap_current['iucn_id'] == sp, 'aoh_pct_overlap'].iloc[0]
+        
+        if pct_overlap_current > 0:
+            filtered_iucn_ids.append(sp)
+
     # Reading in the template raster (extent of tropical forest zone, resolution + projection of AOHs)
     template_raster = rxr.open_rasterio(template_raster_fp)
 
     # Iteratively processing AOHs/hunting pressure maps for each tropical species
-    print(f'Aggregating across {len(iucn_ids)} species')
+    print(f'Aggregating across {len(filtered_iucn_ids)} species')
     start = time.time()
 
-    for sp in iucn_ids:
+    for sp in filtered_iucn_ids:
         if map_type == 'species_richness':
             sp_fp = os.path.join(aoh_dir, f'{sp}_RESIDENT.tif')
         elif map_type == 'hunting_pressure':
