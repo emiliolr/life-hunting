@@ -9,6 +9,7 @@
             "template_raster_fp" : "/Users/emiliolr/Desktop/template_raster.tif",
             "tropical_zone_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_forest_extent/tropical_forest_extent.shp",
             "hunting_preds_dir" : "/Users/emiliolr/Desktop/hunting_testing",
+            "pred_stack_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/hunting_predictor_stack/hunting_predictor_stack_buffered.tif",
             "save_dir" : "/Users/emiliolr/Desktop"
         },
         "remote" : {
@@ -17,6 +18,7 @@
             "template_raster_fp" : "/maps/el590/template_raster.tif",
             "tropical_zone_fp" : "/maps/el590/tropical_forest_extent/tropical_forest_extent.shp",
             "hunting_preds_dir" : "/maps/el590/hunting_pressure_maps",
+            "pred_stack_fp" : "/maps/el590/hunting_predictor_stack/hunting_predictor_stack_buffered.tif",
             "save_dir" : "/maps/el590"
         }
     }

@@ -6,8 +6,10 @@ import time
 sys.path.append('..')
 
 import pandas as pd
-import rioxarray as rxr
 import geopandas as gpd
+
+import rioxarray as rxr
+import xarray as xr
 
 def main(params, mode):
     # Parsing parameters passed in via JSON
@@ -25,6 +27,7 @@ def main(params, mode):
     tropical_zone_fp = filepaths['tropical_zone_fp']
     aoh_dir = filepaths['aoh_dir']
     hunting_preds_dir = filepaths['hunting_preds_dir']
+    pred_stack_fp = filepaths['pred_stack_fp']
 
     if map_type == 'species_richness':
         save_fp = os.path.join(filepaths['save_dir'], 'tropical_species_richness_map.tif')
@@ -73,17 +76,30 @@ def main(params, mode):
 
         template_raster = template_raster + sp_raster # add to running aggregated raster
 
-    print(f'Processing time: {time.time() - start}')
+    print(f'    processing time: {time.time() - start}')
 
     # Cropping the aggregated raster to the forest zone polygon boundaries
     tropical_zone = gpd.read_file(tropical_zone_fp)
     tropical_zone = [tropical_zone.geometry.iloc[0]]
-    agg_raster = template_raster.rio.clip(tropical_zone, all_touched = True).fillna(0)
+    agg_raster = template_raster.rio.clip(tropical_zone, all_touched = True)
+
+    if map_type == 'species_richness':
+        agg_raster = agg_raster.fillna(0)
 
     # If doing hunting pressure, divide through by the number of species per cell to get a mean RR
     if map_type == 'hunting_pressure':
         spp_richness = rxr.open_rasterio(os.path.join(filepaths['save_dir'], 'tropical_species_richness_map.tif'))
+        spp_richness = spp_richness.where(spp_richness != 0) # ensure no divide by 0
         agg_raster = agg_raster / spp_richness
+
+    #  also, mask by nan mask from predictor raster to remove artifacts where there shouldn't be
+    #   any predictions
+    if map_type == 'hunting_pressure':
+        pred_stack = rxr.open_rasterio(pred_stack_fp)
+        pred_stack = xr.ufuncs.isnan(pred_stack).astype(int).sum(dim = 'band') # see where there are nans in any band
+        pred_stack = pred_stack.rio.reproject_match(agg_raster)
+
+        agg_raster = agg_raster.where(pred_stack == 0)
 
     # Saving the final aggregated raster
     dtype = 'uint16' if map_type == 'species_richness' else 'float32'
