@@ -1,6 +1,7 @@
 {
     "model_to_use" : "rf",
-    "num_cores" : 128,
+    "partial" : 1,
+    "num_cores" : 12,
     "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {
