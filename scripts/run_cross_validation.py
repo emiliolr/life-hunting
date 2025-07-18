@@ -70,6 +70,10 @@ def read_data(args):
         data = read_csv_non_utf(ben_lop_path)
     elif args.dataset == 'mammals_recreated':
         data = pd.read_csv(ben_lop_rec_path)
+
+        #  recoding IUCN category to make it a numeric indicator
+        data['IUCN_Is_Threatened'] = data['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
+        data = data.drop(columns = ['IUCN_Category'])
     elif args.dataset == 'mammals_extended':
         data = pd.read_csv(ben_lop_ext_path)
 
@@ -255,7 +259,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         elif args.dataset in ['birds_extended', 'mammals_extended', 'mammals_recreated']:
             zero_columns = None # just using defaults here, which is all available predictors...
         nonzero_columns = zero_columns
-        indicator_columns = []
+        indicator_columns = None if args.dataset == 'mammals_recreated' else []
         
         #  setting up the zero and nonzero models
         zero_model = AutoML()
@@ -321,7 +325,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         direct = None
         
         fit_args = {'zero' : zero_settings, 'nonzero' : nonzero_settings}
-        pp_args = {'include_indicators' : True if 'extended' in args.dataset else False,
+        pp_args = {'include_indicators' : True if ('extended' in args.dataset) or ('recreated' in args.dataset) else False,
                    'include_categorical' : False,
                    'polynomial_features' : 0,
                    'log_trans_cont' : False,
@@ -442,6 +446,8 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         model_name += '_rebalance-classes'
     if args.tune_thresh:
         model_name += '_tune-thresh'
+    if args.experiment_append != '':
+        model_name += f'_{args.experiment_append}'
 
     # Making sure the save directory exists for autoML training
     if args.model_to_use.startswith('FLAML'):
@@ -524,6 +530,7 @@ if __name__ == '__main__':
 
     # RESULTS SAVE PARAMS
     parser.add_argument('--save_fp', type = str, default = '../phd_results')
+    parser.add_argument('--experiment_append', type = str, default = '')
 
     # LINEAR RANDOM-EFFECTS MODEL PARAMS
     parser.add_argument('--use_rfx', type = int, default = 0)

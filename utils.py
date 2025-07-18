@@ -390,9 +390,12 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     elif dataset == 'mammals_recreated':
         all_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                     'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
-                    'Percent_Settlement_50km', 'Protected_Area']
+                    'Percent_Settlement_50km', 'Protected_Area', 'Corruption', 
+                    'Government_Effectiveness', 'Political_Stability', 'Regulation', 
+                    'Rule_of_Law', 'Accountability', 'Travel_Time_Small', 'Forest_Cover', 
+                    'NPP', 'Road_Density', 'GDP_Per_Capita', 'IUCN_Is_Threatened']
         if indicator_columns is None:
-            indicator_columns = ['Country', 'Species', 'Study']
+            indicator_columns = ['IUCN_Country_Region']
         if nonzero_columns is None:
             nonzero_columns = all_cols
         if zero_columns is None:
@@ -490,7 +493,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
                                  'Activity_Diurnal', 'IUCN_For_Handicrafts', 'IUCN_For_Medicine', 'IUCN_Is_Sport_Hunted', 
                                  'IUCN_For_Wearing_Apparel']
             elif dataset == 'mammals_recreated':
-                all_cat_cols += ['Protected_Area']
+                all_cat_cols += ['Protected_Area', 'IUCN_Country_Region']
 
             #  getting the correct columns, recognizing that naming convention may have changed with
             #   addition of indicators variables
@@ -499,6 +502,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
                 for k in all_cat_cols:
                     if k in c:
                         smote_columns.append(c)
+            
+            smote_columns = list(set(smote_columns))
 
             #  applying the SMOTE algorithm to the data for synthetic oversampling
             smote = SMOTENC(categorical_features = smote_columns, random_state = 1693)
@@ -563,11 +568,13 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         special_columns = ['Reserve']
         response_column = 'ratio'
     elif dataset == 'mammals_recreated':
-        indicator_columns = ['Country', 'Species', 'Family', 'Order', 'Study', 'Region']
+        indicator_columns = ['IUCN_Country_Region']
         continuous_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                               'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
-                              'Percent_Settlement_50km']
-        special_columns = ['Protected_Area']
+                              'Percent_Settlement_50km', 'Corruption', 'Government_Effectiveness',
+                              'Political_Stability', 'Regulation', 'Rule_of_Law', 'Accountability',
+                              'Travel_Time_Small', 'Forest_Cover', 'NPP', 'Road_Density', 'GDP_Per_Capita']
+        special_columns = ['Protected_Area', 'IUCN_Is_Threatened']
         response_column = 'Response_Ratio'
     elif dataset == 'birds':
         indicator_columns = ['Study', 'Dataset', 'Order', 'Family', 'Species',
