@@ -70,10 +70,6 @@ def read_data(args):
         data = read_csv_non_utf(ben_lop_path)
     elif args.dataset == 'mammals_recreated':
         data = pd.read_csv(ben_lop_rec_path)
-
-        #  recoding IUCN category to make it a numeric indicator
-        data['IUCN_Is_Threatened'] = data['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
-        data = data.drop(columns = ['IUCN_Category'])
     elif args.dataset == 'mammals_extended':
         data = pd.read_csv(ben_lop_ext_path)
 

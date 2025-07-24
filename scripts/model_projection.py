@@ -161,7 +161,7 @@ def main(params, mode):
 
     #  columns to use
     cols_to_normalize = list(predictor_stack.keys())
-    cols_to_normalize.remove('Protected_Area')
+    cols_to_normalize = [c for c in cols_to_normalize if (c not in 'Protected_Area') and (not c.startswith('IUCN_Country_Region'))]
 
     #  extract columns means + standard deviations
     mammals_cols_to_normalize = mammals_data[cols_to_normalize]
@@ -195,8 +195,9 @@ def main(params, mode):
 
     # Reading in the saved predictive model
     print('Reading saved model')
-
+    
     model_fps = {'rf' : 'rf_hurdle_10.0mins.pkl',
+                 'rf-gov' : 'rf_hurdle_gov_10.0mins.pkl',
                  'xgboost' : 'xgboost_hurdle_10.0mins.pkl',
                  'pymer' : 'pymer_hurdle.pkl'}
     model_fp = os.path.join(model_dir, model_fps[model_to_use])

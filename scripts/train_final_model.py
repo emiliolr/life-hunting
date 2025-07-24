@@ -42,7 +42,7 @@ def setup_and_train_model(args, data):
         elif args.dataset in ['mammals_extended', 'mammals_recreated']:
             zero_columns = None # just using defaults here, which is all available predictors...
         nonzero_columns = zero_columns
-        indicator_columns = []
+        indicator_columns = None if args.dataset == 'mammals_recreated' else []
         
         #  setting up the zero and nonzero models
         zero_model = AutoML()
@@ -96,7 +96,7 @@ def setup_and_train_model(args, data):
 
         #  preprocessing + model fitting params
         fit_args = {'zero' : zero_settings, 'nonzero' : nonzero_settings}
-        pp_args = {'include_indicators' : True if 'extended' in args.dataset else False,
+        pp_args = {'include_indicators' : True if ('extended' in args.dataset) or ('recreated' in args.dataset) else False,
                    'include_categorical' : False,
                    'polynomial_features' : 0,
                    'log_trans_cont' : False,

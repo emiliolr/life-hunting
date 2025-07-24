@@ -392,8 +392,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
                     'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
                     'Percent_Settlement_50km', 'Protected_Area', 'Corruption', 
                     'Government_Effectiveness', 'Political_Stability', 'Regulation', 
-                    'Rule_of_Law', 'Accountability', 'Travel_Time_Small', 'Forest_Cover', 
-                    'NPP', 'Road_Density', 'GDP_Per_Capita', 'IUCN_Is_Threatened']
+                    'Rule_of_Law', 'Accountability']
         if indicator_columns is None:
             indicator_columns = ['IUCN_Country_Region']
         if nonzero_columns is None:
@@ -572,9 +571,8 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         continuous_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                               'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
                               'Percent_Settlement_50km', 'Corruption', 'Government_Effectiveness',
-                              'Political_Stability', 'Regulation', 'Rule_of_Law', 'Accountability',
-                              'Travel_Time_Small', 'Forest_Cover', 'NPP', 'Road_Density', 'GDP_Per_Capita']
-        special_columns = ['Protected_Area', 'IUCN_Is_Threatened']
+                              'Political_Stability', 'Regulation', 'Rule_of_Law', 'Accountability']
+        special_columns = ['Protected_Area']
         response_column = 'Response_Ratio'
     elif dataset == 'birds':
         indicator_columns = ['Study', 'Dataset', 'Order', 'Family', 'Species',
