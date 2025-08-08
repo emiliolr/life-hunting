@@ -393,6 +393,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
                     'Percent_Settlement_50km', 'Protected_Area', 'Corruption', 
                     'Government_Effectiveness', 'Political_Stability', 'Regulation', 
                     'Rule_of_Law', 'Accountability']
+        
         if indicator_columns is None:
             indicator_columns = ['IUCN_Country_Region']
         if nonzero_columns is None:
