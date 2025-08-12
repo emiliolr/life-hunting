@@ -9,6 +9,7 @@ import torch
 from pytaxize import Ids, itis
 
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+from sklearn.decomposition import PCA
 from imblearn.over_sampling import SMOTENC
 
 from custom_metrics import true_skill_statistic
@@ -390,12 +391,10 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     elif dataset == 'mammals_recreated':
         all_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                     'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
-                    'Percent_Settlement_50km', 'Protected_Area', 'Corruption', 
-                    'Government_Effectiveness', 'Political_Stability', 'Regulation', 
-                    'Rule_of_Law', 'Accountability']
+                    'Percent_Settlement_50km', 'Protected_Area', 'PC'] # "PC" here is for governance principal components
         
         if indicator_columns is None:
-            indicator_columns = ['IUCN_Country_Region']
+            indicator_columns = []
         if nonzero_columns is None:
             nonzero_columns = all_cols
         if zero_columns is None:
@@ -558,6 +557,8 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
     # Setting mutable defaults
     if embeddings_args is None:
         embeddings_args = {}
+    
+    pca_cols = []
 
     # Defining the variables needed
     if dataset in ['mammals', 'both']:
@@ -575,6 +576,9 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
                               'Political_Stability', 'Regulation', 'Rule_of_Law', 'Accountability']
         special_columns = ['Protected_Area']
         response_column = 'Response_Ratio'
+
+        pca_cols = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
+                    'Rule_of_Law', 'Accountability']
     elif dataset == 'birds':
         indicator_columns = ['Study', 'Dataset', 'Order', 'Family', 'Species',
                              'Traded', 'Realm', 'Country', 'Food', 'Hunted']
@@ -617,6 +621,40 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         for col in continuous_columns:
             pp_data.loc[pp_data[col] == 0, col] = 0.1 # ensuring we don't run into issues with log
             pp_data[col] = np.log10(pp_data[col].copy(deep = True))
+
+    # Applying PCA to a subset of columns (usually just governance indicators) - doing this BEFORE 
+    #  standardization to be sure PC vars get standardized
+    n_components = 2
+
+    if len(pca_cols) != 0:
+        pca_data = pp_data[pca_cols].copy(deep = True)
+
+        #  if we were supplied train indices, only using those stats for PCA fitting...
+        if train_test_idxs is not None:
+            #  scaling before applying PCA
+            scaler = StandardScaler()
+            pca_train_scaled = scaler.fit_transform(pca_data.iloc[train_test_idxs['train']])
+            pca_test_scaled = scaler.transform(pca_data.iloc[train_test_idxs['test']])
+
+            #  applying PCA
+            pca = PCA(random_state = 1693)
+            pp_train_pca = pca.fit_transform(pca_train_scaled)
+            pp_test_pca = pca.transform(pca_test_scaled)
+
+            pp_data_pca = np.vstack((pp_train_pca, pp_test_pca))
+        else:
+            pca_data_scaled = StandardScaler().fit_transform(pca_data)
+            pp_data_pca = PCA(random_state = 1693).fit_transform(pca_data_scaled)
+
+        pp_data_pca = pp_data_pca[ : , : n_components] # keep only first n principal components
+
+        #  make sure everything ends up back in the original order
+        idx = pp_data.index if train_test_idxs is None else np.concatenate((train_test_idxs['train'], train_test_idxs['test']))
+        pp_data_pca = pd.DataFrame(pp_data_pca, index = idx, columns = [f'PC_{i}' for i in range(n_components)])
+        pp_data_pca = pp_data_pca.sort_index()
+
+        pp_data = pd.concat([pp_data, pp_data_pca], axis = 1) # adding PCs back onto the original dataframe
+        pp_data = pp_data.drop(columns = pca_cols) # get rid of original PCA columns
 
     # Optionally standardizing continuous predictors
     if standardize:
@@ -822,25 +860,23 @@ def direct_train_test(data, train_size = 0.7, task = 'classification', already_p
     return X_train, y_train, X_test, y_test
 
 if __name__ == '__main__':
-    ben_lop_rec_path = '/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_w_original.csv'
+    ben_lop_rec_path = '/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_extended.csv'
     data = pd.read_csv(ben_lop_rec_path)
+
+    np.random.seed(1693)
+
+    train_idxs = list(np.random.choice(data.index, size = 2700, replace = False))
+    test_idxs = [i for i in data.index if i not in train_idxs]
+    train_test_idxs = {'train' : train_idxs, 'test' : test_idxs}
 
     pp_data = preprocess_data(data, include_indicators = False, include_categorical = False,
                               standardize = True, log_trans_cont = False, polynomial_features = 0,
-                              embeddings_to_use = None, embeddings_args = None, train_test_idxs = None,
+                              embeddings_to_use = None, embeddings_args = None, train_test_idxs = train_test_idxs,
                               dataset = 'mammals_recreated')
     
     X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, outlier_cutoff = np.Inf, extirp_pos = False,
                                                                      zero_columns = None, nonzero_columns = None, indicator_columns = None,
-                                                                     embeddings_to_use = None, dataset = 'mammals_recreated', 
-                                                                     rebalance_dataset = True)
-
+                                                                     embeddings_to_use = None, dataset = 'mammals_recreated', rebalance_dataset = True)
+    
     print(X_zero.columns)
-    print('\n\n\n')
     print(X_nonzero.columns)
-
-    print()
-
-    print(X_zero)
-    print('\n\n\n')
-    print(X_nonzero)
