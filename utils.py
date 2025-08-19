@@ -1,6 +1,7 @@
 import sys
 import os
 from io import StringIO
+import pickle
 
 import pandas as pd
 import numpy as np
@@ -391,8 +392,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     elif dataset == 'mammals_recreated':
         all_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                     'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
-                    'Percent_Settlement_50km', 'Protected_Area', 'PC'] # "PC" here is for governance principal components
-        
+                    'Percent_Settlement_50km', 'Protected_Area'] # "PC" here is for governance principal components
         if indicator_columns is None:
             indicator_columns = []
         if nonzero_columns is None:
@@ -515,7 +515,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
 def preprocess_data(data, include_indicators = False, include_categorical = False,
                     standardize = False, log_trans_cont = False, polynomial_features = 0,
                     embeddings_to_use = None, embeddings_args = None, train_test_idxs = None,
-                    dataset = 'mammals'):
+                    pca_save_fp = None, dataset = 'mammals'):
 
     """
     A helper function to preprocess the hunting effects dataset, including predictors.
@@ -644,7 +644,14 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
             pp_data_pca = np.vstack((pp_train_pca, pp_test_pca))
         else:
             pca_data_scaled = StandardScaler().fit_transform(pca_data)
-            pp_data_pca = PCA(random_state = 1693).fit_transform(pca_data_scaled)
+            pca = PCA(random_state = 1693)
+            pp_data_pca = pca.fit_transform(pca_data_scaled)
+
+        #  optionally, saving the PCA object for use in model projection
+        if pca_save_fp is not None:
+            print('Saving governance PCA object')
+            with open(pca_save_fp, 'wb') as f:
+                pickle.dump(pca, f)
 
         pp_data_pca = pp_data_pca[ : , : n_components] # keep only first n principal components
 

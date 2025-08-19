@@ -198,6 +198,7 @@ def main(params, mode):
     
     model_fps = {'rf' : 'rf_hurdle_10.0mins.pkl',
                  'rf-gov' : 'rf_hurdle_gov_10.0mins.pkl',
+                 'rf-pca' : 'rf_hurdle_gov_pca_10.0mins.pkl',
                  'xgboost' : 'xgboost_hurdle_10.0mins.pkl',
                  'pymer' : 'pymer_hurdle.pkl'}
     model_fp = os.path.join(model_dir, model_fps[model_to_use])

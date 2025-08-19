@@ -1,5 +1,5 @@
 {
-    "model_to_use" : "rf-gov",
+    "model_to_use" : "rf-pca",
     "save_raster" : 1,
     "num_cores" : 1,
     "current_aoh" : 1,
@@ -7,24 +7,24 @@
     "filepaths" : {
         "local" : {
             "base_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE",
-            "predictor_stack_fp" : "datasets/derived_datasets/hunting_predictor_stack/hunting_predictor_stack_governance.tif",
+            "predictor_stack_fp" : "datasets/derived_datasets/hunting_predictor_stack/hunting_predictor_stack_governance_pca.tif",
             "tropical_zone_fp" : "datasets/derived_datasets/tropical_forest_extent/tropical_forest_extent.shp",
-            "current_aoh_dir" : "/Users/emiliolr/Desktop/aohs/current",
-            "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/aohs/pnv",
-            "mammals_data_fp" : "datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_extended.csv",
-            "tropical_mammals_fp" : "datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv",
+            "current_aoh_dir" : "/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants",
+            "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants/human_absent",
+            "mammals_data_fp" : "datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_extended_w_pca.csv",
+            "tropical_mammals_fp" : "datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv",
             "model_dir" : "hunting_analysis/final_models",
             "save_dir" : "/Users/emiliolr/Desktop/hunting_testing",
             "error_fp" : "/Users/emiliolr/Desktop/hunting_testing/ERROR_SPECIES.txt"
         },
         "remote" : {
             "base_fp" : "/maps/el590",
-            "predictor_stack_fp" : "hunting_predictor_stack/hunting_predictor_stack_buffered.tif",
+            "predictor_stack_fp" : "hunting_predictor_stack/hunting_predictor_stack_governance_pca.tif",
             "tropical_zone_fp" : "tropical_forest_extent/tropical_forest_extent.shp",
-            "current_aoh_dir" : "/maps/mwd24/life-v1/aohs/current/MAMMALIA",
-            "human_absent_aoh_dir" : "/maps/mwd24/life-v1/aohs/pnv/MAMMALIA",
-            "mammals_data_fp" : "benitez_lopez2019_recreated/benitez_lopez2019_recreated_w_original.csv",
-            "tropical_mammals_fp" : "tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv",
+            "current_aoh_dir" : "/maps/mwd24/life25/aohs/current/MAMMALIA",
+            "human_absent_aoh_dir" : "/maps/mwd24/life25/aohs/pnv/MAMMALIA",
+            "mammals_data_fp" : "benitez_lopez2019_recreated/benitez_lopez2019_recreated_extended_w_pca.csv",
+            "tropical_mammals_fp" : "tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv",
             "model_dir" : "final_models",
             "save_dir" : "/maps/el590/hunting_pressure_maps", 
             "error_fp" : "/maps/el590/ERROR_SPECIES.txt"            

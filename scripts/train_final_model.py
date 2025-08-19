@@ -102,7 +102,8 @@ def setup_and_train_model(args, data):
                    'log_trans_cont' : False,
                    'dataset' : args.dataset,
                    'embeddings_to_use' : None,
-                   'embeddings_args' : None}
+                   'embeddings_args' : None,
+                   'pca_save_fp' : '/Users/emiliolr/Desktop/gov_pca.pickle'}
 
         #  results saving params
         if args.flaml_single_model is None:
