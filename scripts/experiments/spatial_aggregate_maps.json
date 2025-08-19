@@ -1,8 +1,8 @@
 {
     "iucn_id_subset" : [],
-    "map_type" : "partial_aoh_effects",
-    "model_to_use" : "pymer",
-    "current" : 0,
+    "map_type" : "species_richness",
+    "model_to_use" : "rf-pca",
+    "current" : 1,
     "filepaths" : {
         "local" : {
             "aoh_dir" : "/Users/emiliolr/Desktop/aohs",
@@ -14,12 +14,12 @@
             "save_dir" : "/Users/emiliolr/Desktop/hunting_results"
         },
         "remote" : {
-            "aoh_dir" : "/maps/mwd24/life-v1/aohs/current/MAMMALIA",
-            "tropical_mammals_fp" : "/maps/el590/tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv",
+            "aoh_dir" : "/maps/mwd24/life25/aohs",
+            "tropical_mammals_fp" : "/maps/el590/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv",
             "template_raster_fp" : "/maps/el590/template_raster.tif",
             "tropical_zone_fp" : "/maps/el590/tropical_forest_extent/tropical_forest_extent.shp",
             "hunting_preds_dir" : "/maps/el590/hunting_pressure_maps",
-            "pred_stack_fp" : "/maps/el590/hunting_predictor_stack/hunting_predictor_stack_buffered.tif",
+            "pred_stack_fp" : "/maps/el590/hunting_predictor_stack/hunting_predictor_stack_governance_pca.tif",
             "save_dir" : "/maps/el590"
         }
     }

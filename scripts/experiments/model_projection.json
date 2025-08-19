@@ -1,9 +1,9 @@
 {
     "model_to_use" : "rf-pca",
     "save_raster" : 1,
-    "num_cores" : 1,
-    "current_aoh" : 1,
-    "iucn_id_subset" : [181007989, 181008073, 7140],
+    "num_cores" : 32,
+    "current_aoh" : 0,
+    "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {
             "base_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE",
@@ -31,3 +31,4 @@
         }
     }
 }
+

@@ -392,7 +392,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     elif dataset == 'mammals_recreated':
         all_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                     'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
-                    'Percent_Settlement_50km', 'Protected_Area'] # "PC" here is for governance principal components
+                    'Percent_Settlement_50km', 'Protected_Area', 'PC'] # "PC" here is for governance principal components
         if indicator_columns is None:
             indicator_columns = []
         if nonzero_columns is None:

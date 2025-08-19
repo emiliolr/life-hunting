@@ -36,6 +36,10 @@ def main(params, mode):
     cur_aoh_dir = os.path.join(filepaths['aoh_dir'], 'current')
     hum_abs_aoh_dir = os.path.join(filepaths['aoh_dir'], 'pnv')
 
+    if mode == 'remote':
+        cur_aoh_dir += '/MAMMALIA'
+        hum_abs_aoh_dir += '/MAMMALIA'
+
     hunting_preds_dir = filepaths['hunting_preds_dir']
     pred_stack_fp = filepaths['pred_stack_fp']
 
@@ -214,7 +218,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'local'
+    mode = 'remote'
     print(f'Running in {mode} mode\n')
 
     main(params, mode)
