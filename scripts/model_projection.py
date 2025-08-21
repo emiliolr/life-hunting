@@ -1,6 +1,7 @@
 import pickle
 import sys
 import os
+import os.path
 import warnings
 import json
 
@@ -29,6 +30,9 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
 
     # Reading in the relevant AOH
     aoh_fp = os.path.join(aoh_dir, f'{species}_RESIDENT.tif')
+    if not os.path.isfile(aoh_fp):
+      return species, -2
+
     aoh = rxr.open_rasterio(aoh_fp)
 
     # Clipping the predictor rasters to the bounds of the AOH

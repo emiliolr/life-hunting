@@ -1,7 +1,6 @@
 {
-    "model_to_use" : "rf",
-    "partial" : 1,
-    "num_cores" : 12,
+    "model_to_use" : "rf-pca",
+    "num_cores" : 32,
     "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {
@@ -11,10 +10,10 @@
             "tropical_mammals_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv"
         },
         "remote" : {
-            "current_aoh_dir" : "/maps/mwd24/life-v1/aohs/current/MAMMALIA",
-            "human_absent_aoh_dir" : "/maps/mwd24/life-v1/aohs/pnv/MAMMALIA",
+            "current_aoh_dir" : "/maps/mwd24/life25/aohs/current/MAMMALIA",
+            "human_absent_aoh_dir" : "/maps/mwd24/life25/aohs/pnv/MAMMALIA",
             "hunting_preds_dir" : "/maps/el590/hunting_pressure_maps",
-            "tropical_mammals_fp" : "/maps/el590/tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv"
+            "tropical_mammals_fp" : "/maps/el590/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv"
         }
     }
 }
