@@ -131,6 +131,9 @@ def main(params, mode):
     base_fp = filepaths['base_fp']
 
     predictor_stack_fp = os.path.join(base_fp, filepaths['predictor_stack_fp'])
+    if model_to_use == 'rf-gov':
+        predictor_stack_fp = predictor_stack_fp.replace('_pca', '')
+
     tropical_zone_fp = os.path.join(base_fp, filepaths['tropical_zone_fp'])
 
     mammals_data_fp = os.path.join(base_fp, filepaths['mammals_data_fp'])
@@ -210,6 +213,11 @@ def main(params, mode):
     with open(model_fp, 'rb') as f:
         model = pickle.load(f)
 
+    #  tweaking data arguments to be sure the correct vars get to the full governance model
+    if model_to_use == 'rf-gov':
+        model.data_args['nonzero_columns'] = list(model.nonzero_model.feature_names_in_)
+        model.data_args['zero_columns'] = list(model.zero_model.feature_names_in_)
+
     # Reading in the tropical mammal body mass data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
 
@@ -245,7 +253,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'remote'
+    mode = 'local'
     print(f'Running in {mode} mode\n')
 
     #  running the projection procedure over the tropical mammal IUCN IDs

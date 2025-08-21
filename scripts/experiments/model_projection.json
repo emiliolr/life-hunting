@@ -1,9 +1,9 @@
 {
-    "model_to_use" : "rf-pca",
+    "model_to_use" : "rf-gov",
     "save_raster" : 1,
-    "num_cores" : 64,
-    "current_aoh" : 0,
-    "iucn_id_subset" : [],
+    "num_cores" : 1,
+    "current_aoh" : 1,
+    "iucn_id_subset" : [7140, 181007989],
     "filepaths" : {
         "local" : {
             "base_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE",
