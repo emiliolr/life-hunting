@@ -253,7 +253,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'local'
+    mode = 'remote'
     print(f'Running in {mode} mode\n')
 
     #  running the projection procedure over the tropical mammal IUCN IDs
