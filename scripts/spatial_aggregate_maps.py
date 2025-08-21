@@ -42,6 +42,8 @@ def main(params, mode):
 
     hunting_preds_dir = filepaths['hunting_preds_dir']
     pred_stack_fp = filepaths['pred_stack_fp']
+    if model_to_use == 'rf-gov':
+        predictor_stack_fp = predictor_stack_fp.replace('_pca', '')
 
     if map_type == 'species_richness':
         save_fp = os.path.join(filepaths['save_dir'], f'tropical_species_richness_map_{"current" if current else "human_absent"}.tif')
