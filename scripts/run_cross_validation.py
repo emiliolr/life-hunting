@@ -158,12 +158,15 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
 
         #  hurdle model params
         extirp_pos = False
+        indicator_columns = ['Country', 'Species'] + (['Study'] if args.dataset in ['mammals', 'mammals_recreated'] else [])
 
         if args.outlier_cutoff is None:
             args.outlier_cutoff = 15 if args.dataset == 'mammals' else 5
+
         data_args = {'outlier_cutoff' : args.outlier_cutoff, 
                      'dataset' : args.dataset, 
-                     'rebalance_dataset' : args.rebalance_dataset}
+                     'rebalance_dataset' : args.rebalance_dataset,
+                     'indicator_columns' : indicator_columns}
 
         #  setting up the hurdle model
         zero_model = PymerModelWrapper(Lmer, formula = formula_zero, family = 'binomial', control_str = control_str, 
@@ -245,6 +248,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         #  hurdle model params
         verbose = 0
         extirp_pos = False
+        pca_cols = None
         
         if args.dataset in ['mammals', 'both']:
             zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime', 'LivestockBio', 'Reserve'] 
@@ -252,17 +256,37 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         elif args.dataset == 'birds':
             zero_columns = ['Dist_Hunters', 'TravDist', 'PopDens', 'Stunting', 'FoodBiomass', 'Forest_cover', 'NPP', 
                             'Body_Mass', 'Reserve']
-        elif args.dataset in ['birds_extended', 'mammals_extended', 'mammals_recreated']:
+        elif args.dataset in ['birds_extended', 'mammals_extended']:
             zero_columns = None # just using defaults here, which is all available predictors...
+        elif args.dataset == 'mammals_recreated':
+            if args.flaml_single_model == ['rf']:
+                zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                                'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                                'Percent_Settlement_50km', 'Protected_Area']
+            elif args.flaml_single_model == ['rf-gov']:
+                zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                                'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                                'Percent_Settlement_50km', 'Protected_Area', 'Corruption', 
+                                'Government_Effectiveness', 'Political_Stability', 'Regulation', 
+                                'Rule_of_Law', 'Accountability']
+            elif args.flaml_single_model == ['rf-pca']:
+                zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                                'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                                'Percent_Settlement_50km', 'Protected_Area', 'PC']
+                pca_cols = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
+                            'Rule_of_Law', 'Accountability']
+            else:
+                zero_columns = None
+
         nonzero_columns = zero_columns
-        indicator_columns = None if args.dataset == 'mammals_recreated' else []
+        indicator_columns = []
         
         #  setting up the zero and nonzero models
         zero_model = AutoML()
         nonzero_model = AutoML()
         
         #  specify fitting paramaters
-        zero_models_to_try = args.flaml_single_model
+        zero_models_to_try = [args.flaml_single_model[0].replace('-pca', '').replace('-gov', '')]
         if zero_models_to_try is None:
             zero_models_to_try = ['rf', 'lgbm', 'xgboost']
 
@@ -279,7 +303,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
             'eval_method' : 'cv'
         }
         
-        nonzero_models_to_try = args.flaml_single_model
+        nonzero_models_to_try = [args.flaml_single_model[0].replace('-pca', '').replace('-gov', '')]
         if nonzero_models_to_try is None:
             nonzero_models_to_try = ['rf', 'lgbm', 'xgboost']
 
@@ -327,7 +351,8 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                    'log_trans_cont' : False,
                    'dataset' : args.dataset,
                    'embeddings_to_use' : args.embeddings_to_use,
-                   'embeddings_args' : args.embeddings_args}
+                   'embeddings_args' : args.embeddings_args,
+                   'pca_cols' : pca_cols}
 
         #  results saving params
         if args.flaml_single_model is None:
@@ -534,8 +559,10 @@ if __name__ == '__main__':
     # NONLINEAR FLAML MODELS PARAMS
     parser.add_argument('--time_budget_mins', type = float, default = 0.1)
     parser.add_argument('--ensemble', type = int, default = 0)
-    parser.add_argument('--flaml_single_model', type = str, default = '', choices = ['rf', 'xgboost', 'lgbm'])
-
+    parser.add_argument('--flaml_single_model', type = str, default = '', choices = ['rf', 'xgboost', 'lgbm', 'rf-gov', 
+                                                                                     'rf-pca'])
+    
+    
     # EMBEDDING PARAMS
     parser.add_argument('--embeddings_to_use', type = str, nargs = '*', default = [], choices = ['SatCLIP', 'BioCLIP'])
 

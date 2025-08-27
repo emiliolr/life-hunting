@@ -91,7 +91,7 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
         if self.verbose:
             print('  fitting the zero model...')
         self.zero_model.fit(X_zero, y_zero, **fit_args['zero'])
-
+        
     def predict(self, pp_data, return_constit_preds = False):
         X_zero, X_nonzero = get_zero_nonzero_datasets(pp_data, extirp_pos = self.extirp_pos, pred = True, **self.data_args)
         

@@ -169,6 +169,11 @@ def main(params, mode):
     #  columns to use
     cols_to_normalize = list(predictor_stack.keys())
     cols_to_normalize = [c for c in cols_to_normalize if (c not in 'Protected_Area') and (not c.startswith('IUCN_Country_Region'))]
+    
+    gov_vars = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 'Rule_of_Law', 
+                'Accountability', 'PC_0', 'PC_1']
+    if model_to_use == 'pymer':
+        cols_to_normalize = [c for c in cols_to_normalize if c not in gov_vars]
 
     #  extract columns means + standard deviations
     mammals_cols_to_normalize = mammals_data[cols_to_normalize]
@@ -204,19 +209,14 @@ def main(params, mode):
     print('Reading saved model')
     
     model_fps = {'rf' : 'rf_hurdle_10.0mins.pkl',
-                 'rf-gov' : 'rf_hurdle_gov_10.0mins.pkl',
-                 'rf-pca' : 'rf_hurdle_gov_pca_10.0mins.pkl',
+                 'rf-gov' : 'rf-gov_hurdle_10.0mins.pkl',
+                 'rf-pca' : 'rf-pca_hurdle_10.0mins.pkl',
                  'xgboost' : 'xgboost_hurdle_10.0mins.pkl',
                  'pymer' : 'pymer_hurdle.pkl'}
     model_fp = os.path.join(model_dir, model_fps[model_to_use])
     
     with open(model_fp, 'rb') as f:
         model = pickle.load(f)
-
-    #  tweaking data arguments to be sure the correct vars get to the full governance model
-    if model_to_use == 'rf-gov':
-        model.data_args['nonzero_columns'] = list(model.nonzero_model.feature_names_in_)
-        model.data_args['zero_columns'] = list(model.zero_model.feature_names_in_)
 
     # Reading in the tropical mammal body mass data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
@@ -253,7 +253,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'remote'
+    mode = 'local'
     print(f'Running in {mode} mode\n')
 
     #  running the projection procedure over the tropical mammal IUCN IDs

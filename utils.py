@@ -392,7 +392,8 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
     elif dataset == 'mammals_recreated':
         all_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                     'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
-                    'Percent_Settlement_50km', 'Protected_Area', 'PC'] # "PC" here is for governance principal components
+                    'Percent_Settlement_50km', 'Protected_Area']
+
         if indicator_columns is None:
             indicator_columns = []
         if nonzero_columns is None:
@@ -515,7 +516,7 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
 def preprocess_data(data, include_indicators = False, include_categorical = False,
                     standardize = False, log_trans_cont = False, polynomial_features = 0,
                     embeddings_to_use = None, embeddings_args = None, train_test_idxs = None,
-                    pca_save_fp = None, dataset = 'mammals'):
+                    pca_save_fp = None, pca_cols = None, dataset = 'mammals'):
 
     """
     A helper function to preprocess the hunting effects dataset, including predictors.
@@ -558,7 +559,8 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
     if embeddings_args is None:
         embeddings_args = {}
     
-    pca_cols = []
+    if pca_cols is None:
+        pca_cols = []
 
     # Defining the variables needed
     if dataset in ['mammals', 'both']:
@@ -569,16 +571,13 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         special_columns = ['Reserve']
         response_column = 'ratio'
     elif dataset == 'mammals_recreated':
-        indicator_columns = ['IUCN_Country_Region']
+        indicator_columns = ['IUCN_Country_Region', 'Country', 'Species', 'Study']
         continuous_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                               'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
                               'Percent_Settlement_50km', 'Corruption', 'Government_Effectiveness',
                               'Political_Stability', 'Regulation', 'Rule_of_Law', 'Accountability']
         special_columns = ['Protected_Area']
         response_column = 'Response_Ratio'
-
-        pca_cols = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
-                    'Rule_of_Law', 'Accountability']
     elif dataset == 'birds':
         indicator_columns = ['Study', 'Dataset', 'Order', 'Family', 'Species',
                              'Traded', 'Realm', 'Country', 'Food', 'Hunted']
@@ -616,15 +615,17 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         pp_data = pd.DataFrame(pp_data_poly, index = pp_data.index, columns = poly.get_feature_names_out())
         pp_data = pp_data.sort_index()
 
-    # Optionally log10 transforming continuous predictors
+    # Optionally log10 transforming continuous predictors - but NOT governance indicators, which can be negative!
     if log_trans_cont:
         for col in continuous_columns:
-            pp_data.loc[pp_data[col] == 0, col] = 0.1 # ensuring we don't run into issues with log
-            pp_data[col] = np.log10(pp_data[col].copy(deep = True))
+            if col not in ['Corruption', 'Government_Effectiveness', 'Political_Stability', 
+                           'Regulation', 'Rule_of_Law', 'Accountability']:
+                pp_data.loc[pp_data[col] == 0, col] = 0.1 # ensuring we don't run into issues with log
+                pp_data[col] = np.log10(pp_data[col].copy(deep = True))
 
     # Applying PCA to a subset of columns (usually just governance indicators) - doing this BEFORE 
     #  standardization to be sure PC vars get standardized
-    n_components = 2
+    n_components = 1
 
     if len(pca_cols) != 0:
         pca_data = pp_data[pca_cols].copy(deep = True)

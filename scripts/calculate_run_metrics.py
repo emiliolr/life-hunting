@@ -24,7 +24,7 @@ def get_run_info_from_fname(filename):
     bits = filename.split('_')
 
     model = bits[0]
-    assert bits[0] in ['pymer', 'FLAML', 'xgboost', 'rf', 'lgbm', 'dummy'], f'Model "{bits[0]}" is not currently implemented in this function'
+    assert bits[0] in ['pymer', 'FLAML', 'xgboost', 'rf', 'rf-pca', 'rf-gov', 'lgbm', 'dummy'], f'Model "{bits[0]}" is not currently implemented in this function'
     
     if model == 'pymer':
         if ('rebalance' in filename) and ('tune' in filename):
@@ -36,7 +36,7 @@ def get_run_info_from_fname(filename):
         else:
             model_name = bits[0 : 4]
             i = 4
-    elif model in ['FLAML', 'xgboost', 'rf', 'lgbm']:
+    elif model in ['FLAML', 'xgboost', 'rf', 'lgbm', 'rf-pca', 'rf-gov']:
         if (('rebalance' in filename) or ('tune' in filename)) and ('ensemble' not in filename):
             model_name = bits[0 : 4]
             i = 4

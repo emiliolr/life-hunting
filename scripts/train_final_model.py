@@ -36,22 +36,43 @@ def setup_and_train_model(args, data):
         #  hurdle model params
         verbose = 0
         extirp_pos = False
-        
-        if args.dataset == 'mammals':
+        pca_cols = None
+
+        if args.dataset in ['mammals']:
             zero_columns = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime', 'LivestockBio', 'Reserve', 'Literacy'] 
-        elif args.dataset in ['mammals_extended', 'mammals_recreated']:
-            zero_columns = None # just using defaults here, which is all available predictors...
+        elif args.dataset in ['mammals_extended']:
+            zero_columns = None
+        elif args.dataset == 'mammals_recreated':
+            if args.flaml_single_model == ['rf']:
+                zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                                'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                                'Percent_Settlement_50km', 'Protected_Area']
+            elif args.flaml_single_model == ['rf-gov']:
+                zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                                'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                                'Percent_Settlement_50km', 'Protected_Area', 'Corruption', 
+                                'Government_Effectiveness', 'Political_Stability', 'Regulation', 
+                                'Rule_of_Law', 'Accountability']
+            elif args.flaml_single_model == ['rf-pca']:
+                zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                                'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                                'Percent_Settlement_50km', 'Protected_Area', 'PC']
+                pca_cols = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
+                            'Rule_of_Law', 'Accountability']
+            else:
+                zero_columns = None
+
         nonzero_columns = zero_columns
-        indicator_columns = None if args.dataset == 'mammals_recreated' else []
+        indicator_columns = []
         
         #  setting up the zero and nonzero models
         zero_model = AutoML()
         nonzero_model = AutoML()
         
         #  specify fitting paramaters
-        zero_models_to_try = args.flaml_single_model
+        zero_models_to_try = [args.flaml_single_model[0].replace('-pca', '').replace('-gov', '')]
         if zero_models_to_try is None:
-            zero_models_to_try = ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor', 'lrl1', 'lrl2']
+            zero_models_to_try = ['rf', 'lgbm', 'xgboost']
 
         zero_settings = {
             'time_budget' : args.time_budget_mins * 60,  # in seconds
@@ -66,9 +87,9 @@ def setup_and_train_model(args, data):
             'eval_method' : 'cv'
         }
         
-        nonzero_models_to_try = args.flaml_single_model
+        nonzero_models_to_try = [args.flaml_single_model[0].replace('-pca', '').replace('-gov', '')]
         if nonzero_models_to_try is None:
-            nonzero_models_to_try = ['lgbm', 'xgboost', 'xgb_limitdepth', 'rf', 'extra_tree', 'kneighbor']
+            nonzero_models_to_try = ['rf', 'lgbm', 'xgboost']
 
         nonzero_settings = {
             'time_budget' : args.time_budget_mins * 60,  # in seconds
@@ -103,7 +124,7 @@ def setup_and_train_model(args, data):
                    'dataset' : args.dataset,
                    'embeddings_to_use' : None,
                    'embeddings_args' : None,
-                   'pca_save_fp' : '/Users/emiliolr/Desktop/gov_pca.pickle'}
+                   'pca_cols' : pca_cols}
 
         #  results saving params
         if args.flaml_single_model is None:
@@ -131,12 +152,14 @@ def setup_and_train_model(args, data):
 
         #  hurdle model params
         extirp_pos = False
+        indicator_columns = ['Country', 'Species'] + (['Study'] if args.dataset in ['mammals', 'mammals_recreated'] else [])
 
         if args.outlier_cutoff is None:
             args.outlier_cutoff = 15 if args.dataset == 'mammals' else 5
         data_args = {'outlier_cutoff' : args.outlier_cutoff, 
                      'dataset' : args.dataset, 
-                     'rebalance_dataset' : args.rebalance_dataset}
+                     'rebalance_dataset' : args.rebalance_dataset,
+                     'indicator_columns' : indicator_columns}
 
         #  setting up the hurdle model
         zero_model = PymerModelWrapper(Lmer, formula = args.pymer_zero_formula, family = 'binomial', 
@@ -164,6 +187,8 @@ def setup_and_train_model(args, data):
     # Train the hurdle model
     if args.verbose:
         print(f'Training the {args.model_to_use} hurdle model on {args.dataset}')
+        if args.flaml_single_model is not None:
+            print(f'  (single FLAML model - {args.flaml_single_model[0]})')
     train_model(args, model, pp_data, fit_args)
 
     return model
@@ -234,7 +259,7 @@ if __name__ == '__main__':
 
     # NONLINEAR FLAML MODELS PARAMS
     parser.add_argument('--time_budget_mins', type = float, default = 0.1)
-    parser.add_argument('--flaml_single_model', type = str, default = '', choices = ['rf', 'xgboost'])
+    parser.add_argument('--flaml_single_model', type = str, default = '', choices = ['rf', 'xgboost', 'lgbm', 'rf-gov', 'rf-pca'])
 
     # LINEAR PYMER MODEL PARAMS
     parser.add_argument('--pymer_zero_formula', type = str, default = '')
@@ -254,9 +279,9 @@ if __name__ == '__main__':
 
     #  a few arguments to set this apart from the feature selection script
     args.verbose = True
-    args.return_model = False
+    args.return_model = True
     args.save_trained_model = True
     args.pymer_reml = True # for fitting final models, always use restricted max likelihood
 
     # Train the model on the full dataset using the inputted parameters
-    fp = main(args)
+    model = main(args)
