@@ -1,6 +1,6 @@
 {
     "iucn_id_subset" : [],
-    "map_type" : "species_richness",
+    "map_type" : "joint_aoh_effect",
     "model_to_use" : "rf-pca",
     "current" : 1,
     "filepaths" : {

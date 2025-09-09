@@ -1,9 +1,9 @@
 {
-    "model_to_use" : "rf-pca",
+    "model_to_use" : "pymer",
     "save_raster" : 1,
     "num_cores" : 32,
-    "current_aoh" : 1,
-    "iucn_id_subset" : 10,
+    "current_aoh" : 0,
+    "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {
             "base_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE",

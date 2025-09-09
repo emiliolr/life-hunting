@@ -1,5 +1,5 @@
 {
-    "model_to_use" : "rf-pca",
+    "model_to_use" : "pymer",
     "num_cores" : 32,
     "iucn_id_subset" : [],
     "filepaths" : {
