@@ -195,16 +195,6 @@ def main(params, mode):
             agg_raster_hunt = agg_raster_hunt.where(pred_stack == 0)
             agg_raster_hab = agg_raster_hab.where(pred_stack == 0)
 
-    # For the joint/partial AOH effects, divide through by the cell size in km^2
-    if map_type in ['joint_aoh_effect', 'partial_aoh_effects']:
-        cell_size = rxr.open_rasterio(template_raster_fp.replace('.tif', '_cell_area.tif'))
-
-        if map_type != 'partial_aoh_effects':
-            agg_raster = agg_raster / cell_size
-        else:
-            agg_raster_hunt = agg_raster_hunt / cell_size
-            agg_raster_hab = agg_raster_hab / cell_size
-
     # Saving the final aggregated raster
     dtype = 'uint16' if map_type == 'species_richness' else 'float32'
 
