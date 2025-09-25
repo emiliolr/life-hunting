@@ -20,7 +20,7 @@ from pymer4 import Lmer
 from flaml import AutoML
 
 from utils import read_csv_non_utf
-from model_utils import HurdleModelEstimator, PymerModelWrapper
+from model_utils import HurdleModelEstimator, PymerModelWrapper, ThreePartModel
 from custom_metrics import balanced_accuracy_FLAML, median_absolute_error_FLAML, mean_absolute_error_range
 from cross_validation import run_cross_val, save_cv_results
 
@@ -369,6 +369,120 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         if args.ensemble:
             model_name += '_ensemble'
 
+     # FLAML AutoML three-part model
+    elif args.model_to_use == 'FLAML_three_part':
+        #  automl params
+        base_path = os.path.join('..', 'model_saves')
+        
+        class_metric = balanced_accuracy_FLAML
+        reg_metric = median_absolute_error_FLAML
+
+        #  three-part model params
+        verbose = 0
+        args.tune_hurdle_thresh = False
+        
+        if args.dataset == 'mammals_recreated':
+            pred_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                         'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                         'Percent_Settlement_50km', 'Protected_Area', 'PC']
+            pca_cols = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
+                        'Rule_of_Law', 'Accountability']
+        else:
+            raise ValueError('Only "mammals_recreated" is supported right now for the three-part model.')
+
+        classifier_columns = pred_cols
+        decrease_columns = pred_cols
+        increase_columns = pred_cols
+        indicator_columns = []
+        
+        #  setting up the three constituent models
+        class_model = AutoML()
+        decrease_model = AutoML()
+        increase_model = AutoML()
+        
+        #  specify fitting paramaters
+        if args.flaml_single_model is None:
+            class_models_to_try = ['rf', 'xgboost']
+        else:
+            class_models_to_try = [args.flaml_single_model[0].replace('-pca', '').replace('-gov', '')]
+
+        class_settings = {
+            'time_budget' : args.time_budget_mins * 60,  # in seconds
+            'metric' : class_metric,
+            'task' : 'classification',
+            'log_file_name' : os.path.join(base_path, f'{args.dataset}_three_part_classifier.log'),
+            'seed' : 1693,
+            'estimator_list' : class_models_to_try,
+            'early_stop' : True,
+            'verbose' : verbose,
+            'keep_search_state' : True,
+            'eval_method' : 'cv'
+        }
+        
+        if args.flaml_single_model is None:
+            reg_models_to_try = ['rf', 'xgboost']
+        else:
+            reg_models_to_try = [args.flaml_single_model[0].replace('-pca', '').replace('-gov', '')]
+
+        decrease_settings = {
+            'time_budget' : (args.time_budget_mins / 2) * 60,  # in seconds
+            'metric' : reg_metric,
+            'task' : 'regression',
+            'log_file_name' : os.path.join(base_path, f'{args.dataset}_three_part_decrease.log'),
+            'seed' : 1693,
+            'estimator_list' : reg_models_to_try,
+            'early_stop' : True,
+            'verbose' : verbose,
+            'keep_search_state' : True,
+            'eval_method' : 'cv'
+        }
+
+        increase_settings = {
+            'time_budget' : (args.time_budget_mins / 2) * 60,  # in seconds
+            'metric' : reg_metric,
+            'task' : 'regression',
+            'log_file_name' : os.path.join(base_path, f'{args.dataset}_three_part_increase.log'),
+            'seed' : 1693,
+            'estimator_list' : reg_models_to_try,
+            'early_stop' : True,
+            'verbose' : verbose,
+            'keep_search_state' : True,
+            'eval_method' : 'cv'
+        }
+        
+        #  dumping everything into the three-part model wrapper
+        data_args = {'indicator_columns' : indicator_columns,
+                     'classifier_columns' : classifier_columns,
+                     'decrease_columns' : decrease_columns,
+                     'increase_columns' : increase_columns,
+                     'dataset' : args.dataset,
+                     'rebalance_dataset' : args.rebalance_dataset,
+                     'outlier_cutoff' : args.outlier_cutoff if args.outlier_cutoff is not None else np.Inf,
+                     'neighborhood' : 0.1}
+        model = ThreePartModel(class_model, decrease_model, increase_model, data_args = data_args, 
+                               classes_enc = None, verbose = verbose)
+
+        #  cross-validation params
+        back_transform = False
+        sklearn_submodels = False
+        direct = None
+        
+        fit_args = {'classifier' : class_settings, 
+                    'decrease' : decrease_settings,
+                    'increase' : increase_settings}
+        pp_args = {'include_indicators' : True,
+                   'include_categorical' : False,
+                   'polynomial_features' : 0,
+                   'log_trans_cont' : False,
+                   'dataset' : args.dataset,
+                   'pca_cols' : pca_cols}
+
+        #  results saving params
+        if args.flaml_single_model is None:
+            model_name = f'FLAML_three_part_{args.time_budget_mins}mins'
+        else:
+            model_name = f'{args.flaml_single_model[0]}_three_part_{args.time_budget_mins}mins'
+
     # FLAML AutoML direct regression model
     elif args.model_to_use == 'FLAML_regression':
         #  initialize automl instance
@@ -479,7 +593,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
     print(f'Training/testing on {args.dataset} dataset{'s' if args.dataset == 'both' else ''}\n')
     print(f'Using {model_name} with{" no" if args.outlier_cutoff is None else ""} outlier cutoff {"of " + str(args.outlier_cutoff) if args.outlier_cutoff is not None else ""}\n')
 
-    if (args.model_to_use == 'FLAML_hurdle') and (args.flaml_single_model is not None):
+    if (args.model_to_use in ['FLAML_hurdle', 'FLAML_three_part']) and (args.flaml_single_model is not None):
         print(f'Using FLAML to hyperparameter tune just {args.flaml_single_model[0]}\n')
 
     if args.dataset != 'both':
@@ -539,8 +653,8 @@ if __name__ == '__main__':
 
     # MODEL PARAMS
     parser.add_argument('--model_to_use', type = str, default = 'FLAML_hurdle', choices = ['pymer', 'sklearn', 'FLAML_hurdle', 
-                                                                                           'FLAML_regression', 'FLAML_classification', 
-                                                                                           'dummy_regressor'])
+                                                                                           'FLAML_three_part','FLAML_regression', 
+                                                                                           'FLAML_classification', 'dummy_regressor'])
     parser.add_argument('--vals_to_save', type = str, nargs = '*', default = ['metrics'], choices = ['metrics', 'raw'])
 
     # CROSS-VALIDATION PARAMS

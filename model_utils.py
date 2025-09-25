@@ -115,23 +115,22 @@ class ThreePartModel(RegressorMixin, BaseEstimator):
     """
 
     def __init__(self, classifier, regressor_decrease, regressor_increase, data_args = None, 
-                 classes = None, verbose = False):
+                 classes_enc = None, verbose = False):
         self.classifier = classifier
         self.regressor_decrease = regressor_decrease
         self.regressor_increase = regressor_increase
 
         self.data_args = {} if data_args is None else data_args
-        
         self.verbose = verbose
 
-        if classes is None:
+        if classes_enc is None:
             self.classes_enc = {'extirpated' : 0, 
                                 'decrease' : 1, 
                                 'no change' : 2,
                                 'increase' : 3}
         else:
-            self.classes_enc = classes
-        self.classes_dec = {v : k for k, v in self.classes_enc.item()}
+            self.classes_enc = classes_enc
+        self.classes_dec = {v : k for k, v in self.classes_enc.items()}
 
     def fit(self, pp_data, fit_args = None):
         if fit_args is None:
@@ -159,6 +158,7 @@ class ThreePartModel(RegressorMixin, BaseEstimator):
     def predict(self, pp_data, return_constit_preds = False):
         X_class, X_increase, X_decrease = get_three_part_datasets(pp_data,
                                                                   pred = True, 
+                                                                  classes_enc = self.classes_enc,
                                                                   **self.data_args)
 
         #  get the predictions for each model
@@ -171,8 +171,8 @@ class ThreePartModel(RegressorMixin, BaseEstimator):
         y_pred = np.repeat(missing_val, pp_data.shape[0])
 
         #   local extirpation and no abundance change
-        y_pred[y_pred_class == self.classes_enc['extirpated']] = self.classes_enc['extirpated']
-        y_pred[y_pred_class == self.classes_enc['no change']] = self.classes_enc['no change']
+        y_pred[y_pred_class == self.classes_enc['extirpated']] = 0
+        y_pred[y_pred_class == self.classes_enc['no change']] = 1
 
         #   decreases and increases in abundance
         y_pred[y_pred_class == self.classes_enc['decrease']] = y_pred_dec[y_pred_class == self.classes_enc['decrease']]

@@ -13,7 +13,7 @@ from verde import BlockKFold
 
 from utils import direct_train_test, preprocess_data, get_zero_nonzero_datasets, \
                   test_thresholds, ratios_to_DI_cats
-from model_utils import HurdleModelEstimator
+from model_utils import HurdleModelEstimator, ThreePartModel
 
 def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = None, spatial_spacing = 5,
                   fit_args = None, pp_args = None, class_metrics = None, reg_metrics = None, verbose = True,
@@ -135,8 +135,13 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
     # Data structure for saving predictions
     all_preds = {'index' : [], 'fold' : [], 'actual' : [], 'predicted' : []}
     if direct is None:
-        all_preds['predicted_zero'] = []
-        all_preds['predicted_nonzero'] = []
+        if isinstance(model, HurdleModelEstimator):
+            all_preds['predicted_zero'] = []
+            all_preds['predicted_nonzero'] = []
+        elif isinstance(model, ThreePartModel):
+            all_preds['predicted_class'] = []
+            all_preds['predicted_decrease'] = []
+            all_preds['predicted_increase'] = []
 
     # Running the k-fold cross-validation
     for i, split in enumerate(splits):
@@ -187,7 +192,10 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
                     print(f'  optimal threshold was found to be {model.prob_thresh}')
 
             #  predicting on the test set
-            y_pred, y_pred_zero, y_pred_nonzero = model.predict(test_data, return_constit_preds = True)
+            if isinstance(model, HurdleModelEstimator):
+                y_pred, y_pred_zero, y_pred_nonzero = model.predict(test_data, return_constit_preds = True)
+            elif isinstance(model, ThreePartModel):
+                y_pred, y_pred_class, y_pred_dec, y_pred_inc = model.predict(test_data, return_constit_preds = True)
 
             resp_col = 'ratio' if pp_args['dataset'] in ['mammals', 'both'] else 'RR'
             if pp_args['dataset'] == 'mammals_extended':
@@ -232,8 +240,13 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
 
         all_preds['predicted'].extend(y_pred)
         if direct is None:
-            all_preds['predicted_zero'].extend(y_pred_zero)
-            all_preds['predicted_nonzero'].extend(np.exp(y_pred_nonzero)) # making sure this is expressed as a ratio rather than log-transformed
+            if isinstance(model, HurdleModelEstimator):
+                all_preds['predicted_zero'].extend(y_pred_zero)
+                all_preds['predicted_nonzero'].extend(np.exp(y_pred_nonzero)) # making sure this is expressed as a ratio rather than log-transformed
+            elif isinstance(model, ThreePartModel):
+                all_preds['predicted_class'].extend(y_pred_class)
+                all_preds['predicted_decrease'].extend(y_pred_dec)
+                all_preds['predicted_increase'].extend(y_pred_inc)
 
         # Get metrics
         if pp_args['dataset'] != 'both':
