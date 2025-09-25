@@ -6,7 +6,7 @@ from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.model_selection import KFold
 from sklearn.metrics import recall_score, balanced_accuracy_score
 
-from utils import get_zero_nonzero_datasets, ratios_to_DI_cats
+from utils import get_zero_nonzero_datasets, get_three_part_datasets, ratios_to_DI_cats
 
 class PymerModelWrapper:
 
@@ -104,24 +104,85 @@ class HurdleModelEstimator(RegressorMixin, BaseEstimator):
             return y_pred, y_pred_zero.astype(int), y_pred_nonzero
         return y_pred
 
-class TwoStageNovelModel(RegressorMixin, BaseEstimator):
+class ThreePartModel(RegressorMixin, BaseEstimator):
 
-    def __init__(self, classifier, regressor_decrease, regressor_increase, classes = None):
+    """
+    A wrapper class to bind together three model components of the three-part model: 
+      - a classifier to distinguish local extirpation, decrease, no change, and 
+          increase in abundance, 
+      - a regressor for abundance decreases, and
+      - a regressor for abundance increases.
+    """
+
+    def __init__(self, classifier, regressor_decrease, regressor_increase, data_args = None, 
+                 classes = None, verbose = False):
         self.classifier = classifier
-        self.regressor_decline = regressor_decrease
+        self.regressor_decrease = regressor_decrease
         self.regressor_increase = regressor_increase
 
-        self.classes = {'extirpated' : 0, 'decrease' : 1, 'no_effect' : 2,
-                        'increase' : 3}
+        self.data_args = {} if data_args is None else data_args
+        
+        self.verbose = verbose
 
-    def fit(self):
-        pass
+        if classes is None:
+            self.classes_enc = {'extirpated' : 0, 
+                                'decrease' : 1, 
+                                'no change' : 2,
+                                'increase' : 3}
+        else:
+            self.classes_enc = classes
+        self.classes_dec = {v : k for k, v in self.classes_enc.item()}
 
-    def predict(self):
-        pass
+    def fit(self, pp_data, fit_args = None):
+        if fit_args is None:
+            fit_args = {'classifier' : {}, 
+                        'decrease' : {},
+                        'increase' : {}}
 
-    def predict_proba(self):
-        pass
+        X_class, y_class, X_increase, y_increase, X_decrease, y_decrease = get_three_part_datasets(pp_data, 
+                                                                                                   pred = False, 
+                                                                                                   classes_enc = self.classes_enc,
+                                                                                                   **self.data_args)
+
+        if self.verbose:
+            print('  fitting the classifier...')
+        self.classifier.fit(X_class, y_class, **fit_args['classifier'])
+
+        if self.verbose:
+            print('  fitting the decrease model...')
+        self.regressor_decrease.fit(X_decrease, y_decrease, **fit_args['decrease'])
+
+        if self.verbose:
+            print('  fitting the increase model...')
+        self.regressor_increase.fit(X_increase, y_increase, **fit_args['increase'])
+
+    def predict(self, pp_data, return_constit_preds = False):
+        X_class, X_increase, X_decrease = get_three_part_datasets(pp_data,
+                                                                  pred = True, 
+                                                                  **self.data_args)
+
+        #  get the predictions for each model
+        y_pred_class = self.classifier.predict(X_class)
+        y_pred_dec = self.regressor_decrease.predict(X_decrease)
+        y_pred_inc = self.regressor_increase.predict(X_increase)
+
+        #  composing the model predictions
+        missing_val = 1e5
+        y_pred = np.repeat(missing_val, pp_data.shape[0])
+
+        #   local extirpation and no abundance change
+        y_pred[y_pred_class == self.classes_enc['extirpated']] = self.classes_enc['extirpated']
+        y_pred[y_pred_class == self.classes_enc['no change']] = self.classes_enc['no change']
+
+        #   decreases and increases in abundance
+        y_pred[y_pred_class == self.classes_enc['decrease']] = y_pred_dec[y_pred_class == self.classes_enc['decrease']]
+        y_pred[y_pred_class == self.classes_enc['increase']] = y_pred_inc[y_pred_class == self.classes_enc['increase']]
+
+        assert (y_pred == missing_val).sum() == 0, 'Not all predictions were filled in...'
+
+        if return_constit_preds:
+            return y_pred, y_pred_class, y_pred_dec, y_pred_inc
+        return y_pred
 
 def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metrics = None,
                      verbose = True, dataset = 'mammals'):

@@ -13,7 +13,7 @@ from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.decomposition import PCA
 from imblearn.over_sampling import SMOTENC
 
-from custom_metrics import true_skill_statistic
+from custom_metrics import true_skill_statistic, get_DI_cats
 import embeddings
 
 def read_csv_non_utf(filepath, **kwargs):
@@ -513,6 +513,91 @@ def get_zero_nonzero_datasets(pp_data, pred = True, outlier_cutoff = np.Inf, ext
 
     return X_zero, X_nonzero
 
+def get_three_part_datasets(pp_data, classes_enc, pred = True, outlier_cutoff = np.Inf, classifier_columns = None,
+                            decrease_columns = None, increase_columns = None, indicator_columns = None,
+                            dataset = 'mammals_recreated', rebalance_dataset = False, neighborhood = 0.1):
+
+    # Default predictors
+    if dataset == 'mammals_recreated':
+        all_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                    'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                    'Percent_Settlement_50km', 'Protected_Area']
+
+        if indicator_columns is None:
+            indicator_columns = []
+        if classifier_columns is None:
+            classifier_columns = all_cols
+        if decrease_columns is None:
+            decrease_columns = all_cols
+        if increase_columns is None:
+            increase_columns = all_cols
+    else:
+        raise ValueError('The only supported dataset is "mammals_recreated".')
+
+    X_class = pp_data[[]].copy(deep = True)
+    X_increase = pp_data[[]].copy(deep = True)
+    X_decrease = pp_data[[]].copy(deep = True)
+
+    #  filling in like this ensures this works for polynomial features/indicator variables
+    for col in classifier_columns:
+        X_class = pd.concat((X_class, pp_data.filter(like = col)), axis = 1)
+    for col in decrease_columns:
+        X_decrease = pd.concat((X_decrease, pp_data.filter(like = col)), axis = 1)
+    for col in increase_columns:
+        X_increase = pd.concat((X_increase, pp_data.filter(like = col)), axis = 1)
+    for col in indicator_columns:
+        X_class = pd.concat((X_class, pp_data.filter(like = col)), axis = 1)
+        X_decrease = pd.concat((X_decrease, pp_data.filter(like = col)), axis = 1)
+        X_increase = pd.concat((X_increase, pp_data.filter(like = col)), axis = 1)
+
+    #  making sure to toss any duplicate columns
+    X_class = X_class.loc[ : , ~X_class.columns.duplicated()].copy(deep = True)
+    X_decrease = X_decrease.loc[ : , ~X_decrease.columns.duplicated()].copy(deep = True)
+    X_increase = X_increase.loc[ : , ~X_increase.columns.duplicated()].copy(deep = True)
+
+    # Extracting the inputs/outputs for each of the models in the case where we have labels
+    if not pred:
+        resp_col = 'Response_Ratio'
+        ratio = pp_data[resp_col].values
+
+        #  get classifier datasets
+        di_cats = get_DI_cats(ratio, neighborhood = neighborhood)
+        y_class = pd.Series(di_cats).apply(lambda x: classes_enc[x])
+
+        #  get decrease datasets
+        dec_mask = (ratio < 1) & (ratio > 0)
+        X_decrease = X_decrease[dec_mask].copy(deep = True)
+        y_decrease = ratio[dec_mask].copy()
+
+        #  get decrease datasets
+        inc_mask = (ratio > 1) & (ratio <= outlier_cutoff)
+        X_increase = X_increase[inc_mask].copy(deep = True)
+        y_increase = ratio[inc_mask].copy()
+
+        #  optionally rebalancing classes using the categorical-friendly version of SMOTE
+        if rebalance_dataset:
+            #  all potential columns which are categorical
+            all_cat_cols = ['Country', 'Species', 'Study', 'Reserve', 'Diet', 'Protected_Area', 
+                            'IUCN_Country_Region']
+
+            #  getting the correct columns, recognizing that naming convention may have changed with
+            #   addition of indicators variables
+            smote_columns = []
+            for c in X_class.columns:
+                for k in all_cat_cols:
+                    if k in c:
+                        smote_columns.append(c)
+            
+            smote_columns = list(set(smote_columns))
+
+            #  applying the SMOTE algorithm to the data for synthetic oversampling
+            smote = SMOTENC(categorical_features = smote_columns, random_state = 1693)
+            X_class, y_class = smote.fit_resample(X_class, y_class)
+
+        return X_class, y_class, X_increase, y_increase, X_decrease, y_decrease 
+
+    return X_class, X_increase, X_decrease
+
 def preprocess_data(data, include_indicators = False, include_categorical = False,
                     standardize = False, log_trans_cont = False, polynomial_features = 0,
                     embeddings_to_use = None, embeddings_args = None, train_test_idxs = None,
@@ -882,9 +967,16 @@ if __name__ == '__main__':
                               embeddings_to_use = None, embeddings_args = None, train_test_idxs = train_test_idxs,
                               dataset = 'mammals_recreated')
     
-    X_zero, y_zero, X_nonzero, y_nonzero = get_zero_nonzero_datasets(pp_data, pred = False, outlier_cutoff = np.Inf, extirp_pos = False,
-                                                                     zero_columns = None, nonzero_columns = None, indicator_columns = None,
-                                                                     embeddings_to_use = None, dataset = 'mammals_recreated', rebalance_dataset = True)
     
-    print(X_zero.columns)
-    print(X_nonzero.columns)
+    classes_enc = {'extirpated' : 0, 
+                   'decrease' : 1, 
+                   'no change' : 2,
+                   'increase' : 3}
+    X_class, y_class, X_increase, y_increase, X_decrease, y_decrease = get_three_part_datasets(pp_data, classes_enc, pred = False, outlier_cutoff = 5, classifier_columns = None,
+                                                                                               decrease_columns = None, increase_columns = None, indicator_columns = None,
+                                                                                               dataset = 'mammals_recreated', rebalance_dataset = True, neighborhood = 0.05)
+    
+    print(X_class.shape, y_class.shape)
+    print(pd.Series(y_class).value_counts())
+    # print(y_decrease.max(), y_decrease.min())
+    # print(y_increase.max(), y_increase.min())
