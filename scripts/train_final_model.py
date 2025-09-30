@@ -13,7 +13,7 @@ from pymer4 import Lmer
 from flaml import AutoML
 
 from utils import read_csv_non_utf, preprocess_data, get_zero_nonzero_datasets, test_thresholds
-from model_utils import HurdleModelEstimator, PymerModelWrapper
+from model_utils import HurdleModelEstimator, PymerModelWrapper, ThreePartModel
 from custom_metrics import balanced_accuracy_FLAML, median_absolute_error_FLAML
 from run_cross_validation import read_data
 
@@ -181,12 +181,123 @@ def setup_and_train_model(args, data):
         #  results saving params
         args.model_name = 'pymer_hurdle'
 
+    elif args.model_to_use == 'FLAML_three_part':
+        #  automl params
+        base_path = os.path.join(args.save_fp, 'flaml_history')
+        if not os.path.exists(base_path):
+            os.mkdir(base_path)
+        
+        class_metric = balanced_accuracy_FLAML
+        reg_metric = median_absolute_error_FLAML
+
+        #  three-part model params
+        verbose = 0
+        args.tune_hurdle_thresh = False
+        
+        if args.dataset == 'mammals_recreated':
+            pred_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                         'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                         'Percent_Settlement_50km', 'Protected_Area', 'PC']
+            pca_cols = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
+                        'Rule_of_Law', 'Accountability']
+        else:
+            raise ValueError('Only "mammals_recreated" is supported right now for the three-part model.')
+
+        classifier_columns = pred_cols
+        decrease_columns = pred_cols
+        increase_columns = pred_cols
+        indicator_columns = []
+        
+        #  setting up the three constituent models
+        class_model = AutoML()
+        decrease_model = AutoML()
+        increase_model = AutoML()
+        
+        #  specify fitting paramaters
+        if args.flaml_single_model is None:
+            class_models_to_try = ['rf', 'xgboost']
+        else:
+            class_models_to_try = [args.flaml_single_model[0].replace('-pca', '').replace('-gov', '')]
+
+        class_settings = {
+            'time_budget' : args.time_budget_mins * 60,  # in seconds
+            'metric' : class_metric,
+            'task' : 'classification',
+            'log_file_name' : os.path.join(base_path, f'{args.dataset}_three_part_classifier.log'),
+            'seed' : 1693,
+            'estimator_list' : class_models_to_try,
+            'early_stop' : True,
+            'verbose' : verbose,
+            'keep_search_state' : True,
+            'eval_method' : 'cv'
+        }
+        
+        if args.flaml_single_model is None:
+            reg_models_to_try = ['rf', 'xgboost']
+        else:
+            reg_models_to_try = [args.flaml_single_model[0].replace('-pca', '').replace('-gov', '')]
+
+        decrease_settings = {
+            'time_budget' : (args.time_budget_mins / 2) * 60,  # in seconds
+            'metric' : reg_metric,
+            'task' : 'regression',
+            'log_file_name' : os.path.join(base_path, f'{args.dataset}_three_part_decrease.log'),
+            'seed' : 1693,
+            'estimator_list' : reg_models_to_try,
+            'early_stop' : True,
+            'verbose' : verbose,
+            'keep_search_state' : True,
+            'eval_method' : 'cv'
+        }
+
+        increase_settings = {
+            'time_budget' : (args.time_budget_mins / 2) * 60,  # in seconds
+            'metric' : reg_metric,
+            'task' : 'regression',
+            'log_file_name' : os.path.join(base_path, f'{args.dataset}_three_part_increase.log'),
+            'seed' : 1693,
+            'estimator_list' : reg_models_to_try,
+            'early_stop' : True,
+            'verbose' : verbose,
+            'keep_search_state' : True,
+            'eval_method' : 'cv'
+        }
+        
+        #  dumping everything into the three-part model wrapper
+        data_args = {'indicator_columns' : indicator_columns,
+                     'classifier_columns' : classifier_columns,
+                     'decrease_columns' : decrease_columns,
+                     'increase_columns' : increase_columns,
+                     'dataset' : args.dataset,
+                     'rebalance_dataset' : args.rebalance_dataset,
+                     'outlier_cutoff' : args.outlier_cutoff if args.outlier_cutoff is not None else np.Inf,
+                     'neighborhood' : 0.1}
+        model = ThreePartModel(class_model, decrease_model, increase_model, data_args = data_args, 
+                               classes_enc = None, verbose = verbose)
+
+        #  preprocessing + model fitting params
+        fit_args = {'classifier' : class_settings, 
+                    'decrease' : decrease_settings,
+                    'increase' : increase_settings}
+        pp_args = {'include_indicators' : True,
+                   'include_categorical' : False,
+                   'polynomial_features' : 0,
+                   'log_trans_cont' : False,
+                   'dataset' : args.dataset,
+                   'pca_cols' : pca_cols}
+
+        #  results saving params
+        if args.flaml_single_model is None:
+            args.model_name = f'FLAML_three_part_{args.time_budget_mins}mins'
+        else:
+            args.model_name = f'{args.flaml_single_model[0]}_three_part_{args.time_budget_mins}mins'
+
     # Preprocess the data
     pp_data = preprocess_data(data, standardize = True, **pp_args)
 
     # Train the hurdle model
     if args.verbose:
-        print(f'Training the {args.model_to_use} hurdle model on {args.dataset}')
+        print(f'Training the {args.model_to_use}{" hurdle" if "three_part" not in args.model_to_use else ""} model on {args.dataset}')
         if args.flaml_single_model is not None:
             print(f'  (single FLAML model - {args.flaml_single_model[0]})')
     train_model(args, model, pp_data, fit_args)
@@ -252,7 +363,7 @@ if __name__ == '__main__':
     parser.add_argument('--outlier_cutoff', type = float, default = 1000)
 
     # MODEL PARAMS
-    parser.add_argument('--model_to_use', type = str, default = 'FLAML', choices = ['pymer', 'FLAML'])
+    parser.add_argument('--model_to_use', type = str, default = 'FLAML', choices = ['pymer', 'FLAML', 'FLAML_three_part'])
 
     # RESULTS SAVE PARAMS
     parser.add_argument('--save_fp', type = str, default = '../final_models')

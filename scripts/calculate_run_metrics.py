@@ -55,6 +55,9 @@ def get_run_info_from_fname(filename):
             if (('rebalance' in filename) or ('tune' in filename)):
                 model_name = bits[0 : 5]
                 i = 5
+            else:
+                model_name = bits[0 : 4]
+                i = 4
     elif model == 'dummy':
         model_name = bits[0 : 3]
         i = 3
@@ -299,5 +302,4 @@ if __name__ == '__main__':
 
     # Compute metrics
     new_metrics = main(args)
-    # print(new_metrics.head())
-    print(new_metrics[new_metrics['model_name'].str.contains('three_part')])
+    print(new_metrics.head())
