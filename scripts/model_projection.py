@@ -95,7 +95,8 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
 
     #  apply the trained hurdle model to each pixel iteratively
     pred = model.predict(predictors_tabular_no_nan)
-    pred[pred != 0] = np.exp(pred[pred != 0]) # back-transforming log RRs
+    if '3part' not in model_to_use:
+        pred[pred != 0] = np.exp(pred[pred != 0]) # back-transforming log RRs
 
     # Putting the dataset all back together in a predicted raster
     pred_tabular = np.empty(shape = predictors_tabular.shape[0])
@@ -212,7 +213,8 @@ def main(params, mode):
                  'rf-gov' : 'rf-gov_hurdle_10.0mins.pkl',
                  'rf-pca' : 'rf-pca_hurdle_10.0mins.pkl',
                  'xgboost' : 'xgboost_hurdle_10.0mins.pkl',
-                 'pymer' : 'pymer_hurdle.pkl'}
+                 'pymer' : 'pymer_hurdle.pkl', 
+                 'xgboost-3part' : 'xgboost_three_part_10.0mins.pkl'}
     model_fp = os.path.join(model_dir, model_fps[model_to_use])
     
     with open(model_fp, 'rb') as f:
@@ -253,7 +255,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'remote'
+    mode = 'local'
     print(f'Running in {mode} mode\n')
 
     #  running the projection procedure over the tropical mammal IUCN IDs
