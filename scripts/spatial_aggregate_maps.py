@@ -9,12 +9,23 @@ from tqdm import tqdm
 
 import pandas as pd
 import geopandas as gpd
+import numpy as np
 
 import rioxarray as rxr
 import xarray as xr
 
 def shapley_ish_value(aoh_hum_abs, aoh_interest, aoh_other, aoh_joint):
     return (1 / 2) * ((aoh_interest - aoh_hum_abs) + (aoh_joint - aoh_other))
+
+def bm_cats(bm):
+    if bm < 0.1:
+        return 'very small'
+    elif (bm >= 0.1) and (bm < 1):
+        return 'small'
+    elif (bm >= 1) and (bm < 10):
+        return 'medium'
+    else:
+        return 'large'
 
 def main(params, mode):
     # Parsing parameters passed in via JSON
@@ -23,8 +34,12 @@ def main(params, mode):
     model_to_use = params['model_to_use']
     current = bool(params['current'])
 
+    facet_body_mass = bool(params['facet_body_mass'])
+    if facet_body_mass:
+        assert map_type in ['hunting_pressure', 'species_richness'], f'Faceting by body mass not supported for map type {map_type}.'
+
     valid_map_types = ['species_richness', 'hunting_pressure', 'joint_aoh_effect', 'partial_aoh_effects']
-    assert map_type in valid_map_types, f'{map_type} not currently supported'
+    assert map_type in valid_map_types, f'{map_type} not currently supported.'
 
     #  file paths
     filepaths = params['filepaths'][mode]
@@ -45,15 +60,16 @@ def main(params, mode):
     if model_to_use == 'rf-gov':
         predictor_stack_fp = predictor_stack_fp.replace('_pca', '')
 
+    save_dir = filepaths['save_dir'] if not facet_body_mass else os.path.join(filepaths['save_dir'], 'body_mass_facet')
     if map_type == 'species_richness':
-        save_fp = os.path.join(filepaths['save_dir'], f'tropical_species_richness_map_{"current" if current else "human_absent"}.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_richness_map_{"current" if current else "human_absent"}%s.tif')
     elif map_type == 'hunting_pressure':
-        save_fp = os.path.join(filepaths['save_dir'], f'tropical_species_aggregate_hunting_pressure_{model_to_use}.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_hunting_pressure_{model_to_use}%s.tif')
     elif map_type == 'joint_aoh_effect':
-        save_fp = os.path.join(filepaths['save_dir'], f'tropical_species_aggregate_joint_effect_{model_to_use}.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_joint_effect_{model_to_use}%s.tif')
     elif map_type == 'partial_aoh_effects':
-        save_fps = {'hunting' : os.path.join(filepaths['save_dir'], f'tropical_species_aggregate_partial_hunting_effect_{model_to_use}.tif'),
-                    'habitat_loss' : os.path.join(filepaths['save_dir'], f'tropical_species_aggregate_partial_hab_loss_effect_{model_to_use}.tif')}
+        save_fps = {'hunting' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hunting_effect_{model_to_use}%s.tif'),
+                    'habitat_loss' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hab_loss_effect_{model_to_use}%s.tif')}
 
     # Reading in the tropical mammal data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
@@ -77,16 +93,33 @@ def main(params, mode):
         if (pct_overlap_current > 0) and (pct_overlap_human_absent > 0):
             filtered_iucn_ids.append(sp)
 
+    # Get body mass categories, if grouping by body mass
+    if facet_body_mass:
+        tropical_mammals['body_mass_cat'] = (tropical_mammals['combine_body_mass'] / 1000).apply(bm_cats)
+        
+        body_mass_cats = []
+        for sp in filtered_iucn_ids:
+            bm_cat = tropical_mammals[tropical_mammals['iucn_id'] == sp]['body_mass_cat'].iloc[0]
+            body_mass_cats.append(bm_cat)
+
     # Reading in the template raster (extent of tropical forest zone, resolution + projection of AOHs)
     if map_type != 'partial_aoh_effects':
-        template_raster = rxr.open_rasterio(template_raster_fp)
+        if not facet_body_mass:
+            template_raster = rxr.open_rasterio(template_raster_fp)
+        else:
+            templates = {bm_cat : rxr.open_rasterio(template_raster_fp) for bm_cat in np.unique(body_mass_cats)}
     else:
         template_raster_hunt, template_raster_hab = rxr.open_rasterio(template_raster_fp), rxr.open_rasterio(template_raster_fp)
 
     # Iteratively processing AOHs/hunting pressure maps for each tropical species
     print(f'Aggregating across {len(filtered_iucn_ids)} species for map type "{map_type}"' + (f' ({"current" if current else "human_absent"})' if map_type == 'species_richness' else ''))
+    if facet_body_mass:
+        print('  faceting by body mass categories')
 
-    for sp in tqdm(filtered_iucn_ids):
+    for i in tqdm(range(len(filtered_iucn_ids))):
+        sp = filtered_iucn_ids[i]
+        bm_cat = body_mass_cats[i] if facet_body_mass else None
+
         if map_type not in ['joint_aoh_effect', 'partial_aoh_effects']:
             if map_type == 'species_richness':
                 sp_fp = os.path.join(cur_aoh_dir if current else hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
@@ -143,13 +176,16 @@ def main(params, mode):
                 sp_raster_hab = sp_raster_hab.where(hum_abs_aoh != 0) / hum_abs_aoh
 
         if map_type != 'partial_aoh_effects':
-            sp_raster = sp_raster.rio.reproject_match(template_raster).fillna(0) # reproject to match template exactly
+            sp_raster = sp_raster.rio.reproject_match(template_raster if not facet_body_mass else templates[bm_cat]).fillna(0) # reproject to match template exactly
 
             #  turn into a binary AOH map, only for species richness
             if map_type == 'species_richness':
                 sp_raster = (sp_raster > 0).astype(int)
 
-            template_raster = template_raster + sp_raster # add to running aggregated raster
+            if not facet_body_mass:
+                template_raster = template_raster + sp_raster # add to running aggregated raster
+            else:
+                templates[bm_cat] = templates[bm_cat] + sp_raster # add to raster of the body mass category
         else:
             sp_raster_hunt = sp_raster_hunt.rio.reproject_match(template_raster_hunt).fillna(0)
             template_raster_hunt = template_raster_hunt + sp_raster_hunt
@@ -157,26 +193,47 @@ def main(params, mode):
             sp_raster_hab = sp_raster_hab.rio.reproject_match(template_raster_hab).fillna(0)
             template_raster_hab = template_raster_hab + sp_raster_hab
 
+    print()
+    print('Applying postprocessing')
+
     # Cropping the aggregated raster to the forest zone polygon boundaries
     tropical_zone = gpd.read_file(tropical_zone_fp)
     tropical_zone = [tropical_zone.geometry.iloc[0]]
 
     if map_type != 'partial_aoh_effects':
-        agg_raster = template_raster.rio.clip(tropical_zone, all_touched = True)
+        if not facet_body_mass:
+            agg_raster = template_raster.rio.clip(tropical_zone, all_touched = True)
+        else:
+            for k in templates.keys():
+                templates[k] = templates[k].rio.clip(tropical_zone, all_touched = True)
     else:
         agg_raster_hunt = template_raster_hunt.rio.clip(tropical_zone, all_touched = True)
         agg_raster_hab = template_raster_hab.rio.clip(tropical_zone, all_touched = True)
 
     if map_type == 'species_richness':
-        agg_raster = agg_raster.fillna(0)
+        if not facet_body_mass:
+            agg_raster = agg_raster.fillna(0)
+        else:
+            for k in templates.keys():
+                templates[k] = templates[k].fillna(0)
 
     # Divide through by the number of species per cell to get a mean RR (or change in AOH)
     if map_type in ['hunting_pressure', 'joint_aoh_effect', 'partial_aoh_effects']:
-        spp_richness = rxr.open_rasterio(os.path.join(filepaths['save_dir'], f'tropical_species_richness_map_{"current" if map_type == "hunting_pressure" else "human_absent"}.tif'))
-        spp_richness = spp_richness.where(spp_richness != 0) # ensure no divide by 0
-        
+        if not facet_body_mass:
+            spp_richness = rxr.open_rasterio(os.path.join(save_dir, f'tropical_species_richness_map_{"current" if map_type == "hunting_pressure" else "human_absent"}.tif'))
+            spp_richness = spp_richness.where(spp_richness != 0) # ensure no divide by 0
+        else:
+            spp_richness_cats = {}
+            for k in templates.keys():
+                sr_cat = rxr.open_rasterio(os.path.join(save_dir, f'tropical_species_richness_map_current_{k.replace(" ", "_")}.tif'))
+                spp_richness_cats[k] = sr_cat.where(sr_cat != 0)
+
         if map_type != 'partial_aoh_effects':
-            agg_raster = agg_raster / spp_richness
+            if not facet_body_mass:
+                agg_raster = agg_raster / spp_richness
+            else:
+                for k in templates.keys():
+                    templates[k] = templates[k] / spp_richness_cats[k]
         else:
             agg_raster_hunt = agg_raster_hunt / spp_richness
             agg_raster_hab = agg_raster_hab / spp_richness
@@ -188,21 +245,32 @@ def main(params, mode):
         pred_stack = xr.ufuncs.isnan(pred_stack).astype(int).sum(dim = 'band') # see where there are nans in any band
 
         if map_type != 'partial_aoh_effects':
-            pred_stack = pred_stack.rio.reproject_match(agg_raster)
-            agg_raster = agg_raster.where(pred_stack == 0)
+            if not facet_body_mass:
+                pred_stack = pred_stack.rio.reproject_match(agg_raster)
+                agg_raster = agg_raster.where(pred_stack == 0)
+            else:
+                for k in templates.keys():
+                    pred_stack = pred_stack.rio.reproject_match(templates[k])
+                    templates[k] = templates[k].where(pred_stack == 0)
         else:
             pred_stack = pred_stack.rio.reproject_match(agg_raster_hunt)
             agg_raster_hunt = agg_raster_hunt.where(pred_stack == 0)
             agg_raster_hab = agg_raster_hab.where(pred_stack == 0)
 
     # Saving the final aggregated raster
+    print('Saving results')
+
     dtype = 'uint16' if map_type == 'species_richness' else 'float32'
 
     if map_type != 'partial_aoh_effects':
-        agg_raster.rio.to_raster(save_fp, dtype = dtype)
+        if not facet_body_mass:
+            agg_raster.rio.to_raster(save_fp % '', dtype = dtype)
+        else:
+            for k in templates.keys():
+                templates[k].rio.to_raster(save_fp % ('_' + k.replace(' ', '_')), dtype = dtype)
     else:
-        agg_raster_hunt.rio.to_raster(save_fps['hunting'], dtype = dtype)
-        agg_raster_hab.rio.to_raster(save_fps['habitat_loss'], dtype = dtype)
+        agg_raster_hunt.rio.to_raster(save_fps['hunting'] % '', dtype = dtype)
+        agg_raster_hab.rio.to_raster(save_fps['habitat_loss'] % '', dtype = dtype)
 
 if __name__ == '__main__':
     # Read in parameters
@@ -210,7 +278,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'remote'
+    mode = 'local'
     print(f'Running in {mode} mode\n')
 
     main(params, mode)
