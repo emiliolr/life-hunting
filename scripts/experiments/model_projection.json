@@ -1,9 +1,9 @@
 {
-    "model_to_use" : "xgboost-3part",
+    "model_to_use" : "rf-3part",
     "save_raster" : 1,
-    "num_cores" : 1,
-    "current_aoh" : 1,
-    "iucn_id_subset" : [10259],
+    "num_cores" : 32,
+    "current_aoh" : 0,
+    "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {
             "base_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE",
