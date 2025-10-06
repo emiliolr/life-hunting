@@ -1,6 +1,6 @@
 {
-    "model_to_use" : "pymer",
-    "num_cores" : 32,
+    "model_to_use" : "rf-3part",
+    "num_cores" : 64,
     "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {

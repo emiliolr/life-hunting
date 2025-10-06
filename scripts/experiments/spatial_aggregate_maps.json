@@ -1,7 +1,7 @@
 {
     "iucn_id_subset" : [],
-    "map_type" : "joint_aoh_effect",
-    "model_to_use" : "rf-pca",
+    "map_type" : "hunting_pressure",
+    "model_to_use" : "rf-3part",
     "current" : 1,
     "filepaths" : {
         "local" : {
