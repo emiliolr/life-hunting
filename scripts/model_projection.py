@@ -214,7 +214,8 @@ def main(params, mode):
                  'rf-pca' : 'rf-pca_hurdle_10.0mins.pkl',
                  'xgboost' : 'xgboost_hurdle_10.0mins.pkl',
                  'pymer' : 'pymer_hurdle.pkl', 
-                 'xgboost-3part' : 'xgboost_three_part_10.0mins.pkl'}
+                 'xgboost-3part' : 'xgboost_three_part_10.0mins.pkl',
+                 'rf-3part' : 'rf_three_part_10.0mins.pkl'}
     model_fp = os.path.join(model_dir, model_fps[model_to_use])
     
     with open(model_fp, 'rb') as f:
