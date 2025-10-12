@@ -33,6 +33,7 @@ def main(params, mode):
     map_type = params['map_type']
     model_to_use = params['model_to_use']
     current = bool(params['current'])
+    no_increase = bool(params['no_increase'])
 
     facet_body_mass = bool(params['facet_body_mass'])
     if facet_body_mass:
@@ -137,7 +138,12 @@ def main(params, mode):
             cur_aoh = rxr.open_rasterio(cur_aoh_fp)
             hum_abs_aoh = rxr.open_rasterio(hum_abs_aoh_fp)
             hp_cur = rxr.open_rasterio(hp_cur_fp)
-            hp_abs= rxr.open_rasterio(hp_abs_fp)
+            hp_abs = rxr.open_rasterio(hp_abs_fp)
+
+             #  optionally, capping RRs at 1 (no change)
+            if no_increase:
+                hp_cur = hp_cur.clip(max = 1)
+                hp_abs = hp_abs.clip(max = 1)
 
             #  get joint effect of hunting and habitat loss
             hp_cur = hp_cur.rio.reproject_match(cur_aoh)
@@ -181,6 +187,10 @@ def main(params, mode):
             #  turn into a binary AOH map, only for species richness
             if map_type == 'species_richness':
                 sp_raster = (sp_raster > 0).astype(int)
+
+            #  optionally, capping RRs at 1 (no change)
+            if no_increase and map_type == 'hunting_pressure':
+                sp_raster = sp_raster.clip(max = 1)
 
             if not facet_body_mass:
                 template_raster = template_raster + sp_raster # add to running aggregated raster

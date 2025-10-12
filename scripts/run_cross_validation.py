@@ -20,7 +20,7 @@ from pymer4 import Lmer
 from flaml import AutoML
 
 from utils import read_csv_non_utf
-from model_utils import HurdleModelEstimator, PymerModelWrapper, ThreePartModel
+from model_utils import HurdleModelEstimator, PymerModelWrapper, ThreePartModel, SingleValueRegressor
 from custom_metrics import balanced_accuracy_FLAML, median_absolute_error_FLAML, mean_absolute_error_range
 from cross_validation import run_cross_val, save_cv_results
 
@@ -398,7 +398,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         #  setting up the three constituent models
         class_model = AutoML()
         decrease_model = AutoML()
-        increase_model = AutoML()
+        increase_model = AutoML() if not args.no_increase else SingleValueRegressor(single_val = 1)
         
         #  specify fitting paramaters
         if args.flaml_single_model is None:
@@ -481,7 +481,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         if args.flaml_single_model is None:
             model_name = f'FLAML_three_part_{args.time_budget_mins}mins'
         else:
-            model_name = f'{args.flaml_single_model[0]}_three_part_{args.time_budget_mins}mins'
+            model_name = f'{args.flaml_single_model[0]}{'-no-increase' if args.no_increase else ''}_three_part_{args.time_budget_mins}mins'
 
     # FLAML AutoML direct regression model
     elif args.model_to_use == 'FLAML_regression':
@@ -676,6 +676,8 @@ if __name__ == '__main__':
     parser.add_argument('--flaml_single_model', type = str, default = '', choices = ['rf', 'xgboost', 'lgbm', 'rf-gov', 
                                                                                      'rf-pca'])
     
+    # THREE-PART MODEL PARAMS
+    parser.add_argument('--no_increase', type = int, default = 0)
     
     # EMBEDDING PARAMS
     parser.add_argument('--embeddings_to_use', type = str, nargs = '*', default = [], choices = ['SatCLIP', 'BioCLIP'])
@@ -702,6 +704,7 @@ if __name__ == '__main__':
     args.ensemble = bool(args.ensemble)
     args.rebalance_dataset = bool(args.rebalance_dataset)
     args.tune_thresh = bool(args.tune_thresh)
+    args.no_increase = bool(args.no_increase)
 
     if args.embeddings_to_use == []:
         args.embeddings_to_use = None

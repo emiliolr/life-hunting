@@ -569,7 +569,7 @@ def get_three_part_datasets(pp_data, classes_enc, pred = True, outlier_cutoff = 
         X_decrease = X_decrease[dec_mask].copy(deep = True)
         y_decrease = ratio[dec_mask].copy()
 
-        #  get decrease datasets
+        #  get increase datasets
         inc_mask = (ratio > 1) & (ratio <= outlier_cutoff)
         X_increase = X_increase[inc_mask].copy(deep = True)
         y_increase = ratio[inc_mask].copy()

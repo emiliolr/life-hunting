@@ -24,7 +24,7 @@ def get_run_info_from_fname(filename):
     bits = filename.split('_')
 
     model = bits[0]
-    assert bits[0] in ['pymer', 'FLAML', 'xgboost', 'rf', 'rf-pca', 'rf-gov', 'lgbm', 'dummy'], f'Model "{bits[0]}" is not currently implemented in this function'
+    assert bits[0] in ['pymer', 'FLAML', 'xgboost', 'rf', 'rf-pca', 'rf-gov', 'rf-no-increase', 'lgbm', 'dummy'], f'Model "{bits[0]}" is not currently implemented in this function'
     
     if model == 'pymer':
         if ('rebalance' in filename) and ('tune' in filename):
@@ -36,7 +36,7 @@ def get_run_info_from_fname(filename):
         else:
             model_name = bits[0 : 4]
             i = 4
-    elif model in ['FLAML', 'xgboost', 'rf', 'lgbm', 'rf-pca', 'rf-gov']:
+    elif model in ['FLAML', 'xgboost', 'rf', 'lgbm', 'rf-pca', 'rf-gov', 'rf-no-increase']:
         if 'hurdle' in filename:
             if (('rebalance' in filename) or ('tune' in filename)) and ('ensemble' not in filename):
                 model_name = bits[0 : 4]
@@ -47,10 +47,6 @@ def get_run_info_from_fname(filename):
             else:
                 model_name = bits[0 : 3]
                 i = 3
-
-            if bits[i] not in ['mammals', 'birds']:
-                model_name = bits[0 : i + 1]
-                i += 1
         elif 'three_part' in filename:
             if (('rebalance' in filename) or ('tune' in filename)):
                 model_name = bits[0 : 5]
@@ -58,6 +54,10 @@ def get_run_info_from_fname(filename):
             else:
                 model_name = bits[0 : 4]
                 i = 4
+
+        if bits[i] not in ['mammals', 'birds']:
+            model_name = bits[0 : i + 1]
+            i += 1
     elif model == 'dummy':
         model_name = bits[0 : 3]
         i = 3

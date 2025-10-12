@@ -183,6 +183,16 @@ class ThreePartModel(RegressorMixin, BaseEstimator):
         if return_constit_preds:
             return y_pred, y_pred_class, y_pred_dec, y_pred_inc
         return y_pred
+    
+class SingleValueRegressor(RegressorMixin, BaseEstimator):
+    def __init__(self, single_val = 1, **kwargs):
+        self.single_val = single_val
+
+    def fit(self, X, y, **kwargs):
+        pass
+
+    def predict(self, X, **kwargs):
+        return np.repeat(self.single_val, X.shape[0])
 
 def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metrics = None,
                      verbose = True, dataset = 'mammals'):
