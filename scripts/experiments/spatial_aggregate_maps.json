@@ -3,7 +3,7 @@
     "map_type" : "hunting_pressure",
     "model_to_use" : "rf-3part",
     "current" : 1,
-    "no_increase" : 0,
+    "no_increase" : 1,
     "facet_body_mass" : 0,
     "filepaths" : {
         "local" : {
