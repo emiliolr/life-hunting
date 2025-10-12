@@ -16,13 +16,18 @@ import numpy as np
 import rioxarray as rxr
 import xarray as xr
 
-def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir, hunting_preds_dir, model_to_use):
+def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir, hunting_preds_dir, model_to_use, no_increase):
     # Reading in the four needed rasters: (1) human-absent AOH, (2) current AOH, (3 + 4) hunting pressure maps
     human_absent_aoh = rxr.open_rasterio(os.path.join(human_absent_aoh_dir, f'{species}_RESIDENT.tif'))
     human_absent_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'human_absent', f'{species}_hunting_pred_{model_to_use}.tif'))
 
     current_aoh = rxr.open_rasterio(os.path.join(current_aoh_dir, f'{species}_RESIDENT.tif'))
     current_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'current', f'{species}_hunting_pred_{model_to_use}.tif'))
+
+    #  optionally, capping RRs at 1 (no change)
+    if no_increase:
+        current_hp = current_hp.clip(max = 1)
+        human_absent_hp = human_absent_hp.clip(max = 1)
 
     #  ensure hunting pressure maps align precisely w/respective AOHs
     human_absent_hp = human_absent_hp.rio.reproject_match(human_absent_aoh)
@@ -62,6 +67,7 @@ def main(params, mode):
     model_to_use = params['model_to_use']
     iucn_ids = params['iucn_id_subset']
     num_cores = params['num_cores']
+    no_increase = params['no_increase']
 
     #  file paths
     filepaths = params['filepaths'][mode]
@@ -103,11 +109,12 @@ def main(params, mode):
                                                                                                  current_aoh_dir, 
                                                                                                  human_absent_aoh_dir, 
                                                                                                  hunting_preds_dir, 
-                                                                                                 model_to_use) for sp in filtered_iucn_ids)
+                                                                                                 model_to_use,
+                                                                                                 no_increase) for sp in filtered_iucn_ids)
 
     # Saving the data frame containing different bits of AOH info
     aoh_info_df = pd.DataFrame(aoh_dicts)
-    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}.csv'), index = False)
+    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_no-increase" if no_increase else ''}.csv'), index = False)
 
 if __name__ == '__main__':
     # Read in parameters

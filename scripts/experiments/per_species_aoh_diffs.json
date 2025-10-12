@@ -1,7 +1,8 @@
 {
+    "iucn_id_subset" : [],
     "model_to_use" : "rf-3part",
     "num_cores" : 64,
-    "iucn_id_subset" : [],
+    "no_increase" : 1,
     "filepaths" : {
         "local" : {
             "current_aoh_dir" : "/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants",

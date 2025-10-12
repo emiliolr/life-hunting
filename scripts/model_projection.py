@@ -123,6 +123,7 @@ def main(params, mode):
     num_cores = params['num_cores']
 
     current_aoh = params['current_aoh']
+    hybrid_hab_map = params['hybrid_hab_map']
 
     #  a subset of iucn IDs, for testing (if empty, will loop over all IDs)
     iucn_ids = params['iucn_id_subset']
@@ -146,11 +147,15 @@ def main(params, mode):
 
     #  either applying to current AOHs or human-absent
     if current_aoh:
-        aoh_dir = filepaths['current_aoh_dir']
-        save_dir = os.path.join(filepaths['save_dir'], 'current')
+        aoh_dir = filepaths['current_aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir'])
+        save_dir = os.path.join(filepaths['save_dir'], 'current') + ('_hybrid' if hybrid_hab_map else '')
     else:
-        aoh_dir = filepaths['human_absent_aoh_dir']
-        save_dir = os.path.join(filepaths['save_dir'], 'human_absent')
+        aoh_dir = filepaths['human_absent_aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir'])
+        save_dir = os.path.join(filepaths['save_dir'], 'human_absent') + ('_hybrid' if hybrid_hab_map else '')
+
+    print(aoh_dir)
+    print(save_dir)
+    sys.exit()
 
     # Reading in the predictor raster stack
     print('Reading predictor stack')
