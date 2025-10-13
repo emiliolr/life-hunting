@@ -152,11 +152,7 @@ def main(params, mode):
     else:
         aoh_dir = filepaths['human_absent_aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir'])
         save_dir = os.path.join(filepaths['save_dir'], 'human_absent') + ('_hybrid' if hybrid_hab_map else '')
-
-    print(aoh_dir)
-    print(save_dir)
-    sys.exit()
-
+        
     # Reading in the predictor raster stack
     print('Reading predictor stack')
 

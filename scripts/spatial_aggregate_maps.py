@@ -34,6 +34,7 @@ def main(params, mode):
     model_to_use = params['model_to_use']
     current = bool(params['current'])
     no_increase = bool(params['no_increase'])
+    hybrid_hab_map = bool(params['hybrid_hab_map'])
 
     facet_body_mass = bool(params['facet_body_mass'])
     if facet_body_mass:
@@ -49,8 +50,8 @@ def main(params, mode):
     template_raster_fp = filepaths['template_raster_fp']
     tropical_zone_fp = filepaths['tropical_zone_fp']
 
-    cur_aoh_dir = os.path.join(filepaths['aoh_dir'], 'current')
-    hum_abs_aoh_dir = os.path.join(filepaths['aoh_dir'], 'pnv')
+    cur_aoh_dir = os.path.join(filepaths['aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir']), 'current')
+    hum_abs_aoh_dir = os.path.join(filepaths['aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir']), 'pnv')
 
     if mode == 'remote':
         cur_aoh_dir += '/MAMMALIA'
@@ -83,8 +84,8 @@ def main(params, mode):
         iucn_ids = tropical_mammals['iucn_id'].iloc[ : iucn_ids].to_list()
 
     # Reading in the AOH percent overlap file to filter out species
-    aoh_overlap_current = pd.read_csv(os.path.join(hunting_preds_dir, 'current', 'tropical_mammals_aoh_overlap.csv'))
-    aoh_overlap_human_absent = pd.read_csv(os.path.join(hunting_preds_dir, 'human_absent', 'tropical_mammals_aoh_overlap.csv'))
+    aoh_overlap_current = pd.read_csv(os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), 'tropical_mammals_aoh_overlap.csv'))
+    aoh_overlap_human_absent = pd.read_csv(os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), 'tropical_mammals_aoh_overlap.csv'))
 
     filtered_iucn_ids = []
     for sp in iucn_ids:
@@ -125,15 +126,15 @@ def main(params, mode):
             if map_type == 'species_richness':
                 sp_fp = os.path.join(cur_aoh_dir if current else hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
             elif map_type == 'hunting_pressure':
-                sp_fp = os.path.join(hunting_preds_dir, 'current', f'{sp}_hunting_pred_{model_to_use}.tif')
+                sp_fp = os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
 
             sp_raster = rxr.open_rasterio(sp_fp)
         else:
             #  read in needed rasters
             cur_aoh_fp = os.path.join(cur_aoh_dir, f'{sp}_RESIDENT.tif')
             hum_abs_aoh_fp = os.path.join(hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
-            hp_cur_fp = os.path.join(hunting_preds_dir, 'current', f'{sp}_hunting_pred_{model_to_use}.tif')
-            hp_abs_fp = os.path.join(hunting_preds_dir, 'human_absent', f'{sp}_hunting_pred_{model_to_use}.tif')
+            hp_cur_fp = os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
+            hp_abs_fp = os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
 
             cur_aoh = rxr.open_rasterio(cur_aoh_fp)
             hum_abs_aoh = rxr.open_rasterio(hum_abs_aoh_fp)
@@ -288,7 +289,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'local'
+    mode = 'remote'
     print(f'Running in {mode} mode\n')
 
     main(params, mode)
