@@ -64,14 +64,14 @@ def main(params, mode):
 
     save_dir = filepaths['save_dir'] if not facet_body_mass else os.path.join(filepaths['save_dir'], 'body_mass_facet')
     if map_type == 'species_richness':
-        save_fp = os.path.join(save_dir, f'tropical_species_richness_map_{"current" if current else "human_absent"}%s.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_richness_map_{"current" if current else "human_absent"}%s{'_hybrid' if hybrid_hab_map else ''}.tif')
     elif map_type == 'hunting_pressure':
-        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_hunting_pressure_{model_to_use}%s{"_no-increase" if no_increase else ''}.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_hunting_pressure_{model_to_use}%s{"_no-increase" if no_increase else ''}{'_hybrid' if hybrid_hab_map else ''}.tif')
     elif map_type == 'joint_aoh_effect':
-        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_joint_effect_{model_to_use}%s{"_no-increase" if no_increase else ''}.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_joint_effect_{model_to_use}%s{"_no-increase" if no_increase else ''}{'_hybrid' if hybrid_hab_map else ''}.tif')
     elif map_type == 'partial_aoh_effects':
-        save_fps = {'hunting' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hunting_effect_{model_to_use}%s{"_no-increase" if no_increase else ''}.tif'),
-                    'habitat_loss' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hab_loss_effect_{model_to_use}%s{"_no-increase" if no_increase else ''}.tif')}
+        save_fps = {'hunting' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hunting_effect_{model_to_use}%s{"_no-increase" if no_increase else ''}{'_hybrid' if hybrid_hab_map else ''}.tif'),
+                    'habitat_loss' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hab_loss_effect_{model_to_use}%s{"_no-increase" if no_increase else ''}{'_hybrid' if hybrid_hab_map else ''}.tif')}
 
     # Reading in the tropical mammal data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
