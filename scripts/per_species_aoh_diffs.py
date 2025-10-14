@@ -90,8 +90,8 @@ def main(params, mode):
         iucn_ids = tropical_mammals['iucn_id'].iloc[ : iucn_ids].to_list()
 
     # Reading in the AOH percent overlap file to filter out species
-    aoh_overlap_current = pd.read_csv(os.path.join(hunting_preds_dir + ('_hybrid' if hybrid_hab_map else ''), 'current', 'tropical_mammals_aoh_overlap.csv'))
-    aoh_overlap_human_absent = pd.read_csv(os.path.join(hunting_preds_dir + ('_hybrid' if hybrid_hab_map else ''), 'human_absent', 'tropical_mammals_aoh_overlap.csv'))
+    aoh_overlap_current = pd.read_csv(os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), 'tropical_mammals_aoh_overlap.csv'))
+    aoh_overlap_human_absent = pd.read_csv(os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), 'tropical_mammals_aoh_overlap.csv'))
 
     filtered_iucn_ids = []
     for sp in iucn_ids:
