@@ -64,14 +64,14 @@ def main(params, mode):
 
     save_dir = filepaths['save_dir'] if not facet_body_mass else os.path.join(filepaths['save_dir'], 'body_mass_facet')
     if map_type == 'species_richness':
-        save_fp = os.path.join(save_dir, f'tropical_species_richness_map_{"current" if current else "human_absent"}%s{'_hybrid' if hybrid_hab_map else ''}.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_richness_map_{"current" if current else "human_absent"}%s{"_hybrid" if hybrid_hab_map else ""}.tif')
     elif map_type == 'hunting_pressure':
-        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_hunting_pressure_{model_to_use}%s{"_no-increase" if no_increase else ''}{'_hybrid' if hybrid_hab_map else ''}.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_hunting_pressure_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')
     elif map_type == 'joint_aoh_effect':
-        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_joint_effect_{model_to_use}%s{"_no-increase" if no_increase else ''}{'_hybrid' if hybrid_hab_map else ''}.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_joint_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')
     elif map_type == 'partial_aoh_effects':
-        save_fps = {'hunting' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hunting_effect_{model_to_use}%s{"_no-increase" if no_increase else ''}{'_hybrid' if hybrid_hab_map else ''}.tif'),
-                    'habitat_loss' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hab_loss_effect_{model_to_use}%s{"_no-increase" if no_increase else ''}{'_hybrid' if hybrid_hab_map else ''}.tif')}
+        save_fps = {'hunting' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hunting_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
+                    'habitat_loss' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hab_loss_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')}
 
     # Reading in the tropical mammal data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
@@ -231,12 +231,12 @@ def main(params, mode):
     # Divide through by the number of species per cell to get a mean RR (or change in AOH)
     if map_type in ['hunting_pressure', 'joint_aoh_effect', 'partial_aoh_effects']:
         if not facet_body_mass:
-            spp_richness = rxr.open_rasterio(os.path.join(save_dir, f'tropical_species_richness_map_{"current" if map_type == "hunting_pressure" else "human_absent"}.tif'))
+            spp_richness = rxr.open_rasterio(os.path.join(save_dir, f'tropical_species_richness_map_{"current" if map_type == "hunting_pressure" else "human_absent"}{"_hybrid" if hybrid_hab_map else ""}.tif'))
             spp_richness = spp_richness.where(spp_richness != 0) # ensure no divide by 0
         else:
             spp_richness_cats = {}
             for k in templates.keys():
-                sr_cat = rxr.open_rasterio(os.path.join(save_dir, f'tropical_species_richness_map_current_{k.replace(" ", "_")}.tif'))
+                sr_cat = rxr.open_rasterio(os.path.join(save_dir, f'tropical_species_richness_map_current_{k.replace(" ", "_")}{"_hybrid" if hybrid_hab_map else ""}.tif'))
                 spp_richness_cats[k] = sr_cat.where(sr_cat != 0)
 
         if map_type != 'partial_aoh_effects':
