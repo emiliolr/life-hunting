@@ -16,13 +16,13 @@ import numpy as np
 import rioxarray as rxr
 import xarray as xr
 
-def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir, hunting_preds_dir, model_to_use, no_increase):
+def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir, hunting_preds_dir, model_to_use, no_increase, hybrid_hab_map):
     # Reading in the four needed rasters: (1) human-absent AOH, (2) current AOH, (3 + 4) hunting pressure maps
     human_absent_aoh = rxr.open_rasterio(os.path.join(human_absent_aoh_dir, f'{species}_RESIDENT.tif'))
-    human_absent_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'human_absent', f'{species}_hunting_pred_{model_to_use}.tif'))
+    human_absent_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}.tif'))
 
     current_aoh = rxr.open_rasterio(os.path.join(current_aoh_dir, f'{species}_RESIDENT.tif'))
-    current_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'current', f'{species}_hunting_pred_{model_to_use}.tif'))
+    current_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}.tif'))
 
     #  optionally, capping RRs at 1 (no change)
     if no_increase:
@@ -68,6 +68,7 @@ def main(params, mode):
     iucn_ids = params['iucn_id_subset']
     num_cores = params['num_cores']
     no_increase = params['no_increase']
+    hybrid_hab_map = bool(params['hybrid_hab_map'])
 
     #  file paths
     filepaths = params['filepaths'][mode]
@@ -75,8 +76,8 @@ def main(params, mode):
     tropical_mammals_fp = filepaths['tropical_mammals_fp']
 
     hunting_preds_dir = filepaths['hunting_preds_dir']
-    current_aoh_dir = filepaths['current_aoh_dir']
-    human_absent_aoh_dir = filepaths['human_absent_aoh_dir']
+    current_aoh_dir = filepaths['current_aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir'])
+    human_absent_aoh_dir = filepaths['human_absent_aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir'])
 
     # Reading in the tropical mammal body mass data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
@@ -89,8 +90,8 @@ def main(params, mode):
         iucn_ids = tropical_mammals['iucn_id'].iloc[ : iucn_ids].to_list()
 
     # Reading in the AOH percent overlap file to filter out species
-    aoh_overlap_current = pd.read_csv(os.path.join(hunting_preds_dir, 'current', 'tropical_mammals_aoh_overlap.csv'))
-    aoh_overlap_human_absent = pd.read_csv(os.path.join(hunting_preds_dir, 'human_absent', 'tropical_mammals_aoh_overlap.csv'))
+    aoh_overlap_current = pd.read_csv(os.path.join(hunting_preds_dir + ('_hybrid' if hybrid_hab_map else ''), 'current', 'tropical_mammals_aoh_overlap.csv'))
+    aoh_overlap_human_absent = pd.read_csv(os.path.join(hunting_preds_dir + ('_hybrid' if hybrid_hab_map else ''), 'human_absent', 'tropical_mammals_aoh_overlap.csv'))
 
     filtered_iucn_ids = []
     for sp in iucn_ids:
@@ -110,11 +111,12 @@ def main(params, mode):
                                                                                                  human_absent_aoh_dir, 
                                                                                                  hunting_preds_dir, 
                                                                                                  model_to_use,
-                                                                                                 no_increase) for sp in filtered_iucn_ids)
+                                                                                                 no_increase,
+                                                                                                 hybrid_hab_map) for sp in filtered_iucn_ids)
 
     # Saving the data frame containing different bits of AOH info
     aoh_info_df = pd.DataFrame(aoh_dicts)
-    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_no-increase" if no_increase else ''}.csv'), index = False)
+    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_no-increase" if no_increase else ''}{"_hybrid" if hybrid_hab_map else ""}.csv'), index = False)
 
 if __name__ == '__main__':
     # Read in parameters

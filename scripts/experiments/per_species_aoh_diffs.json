@@ -3,16 +3,21 @@
     "model_to_use" : "rf-3part",
     "num_cores" : 64,
     "no_increase" : 1,
+    "hybrid_hab_map" : 0,
     "filepaths" : {
         "local" : {
-            "current_aoh_dir" : "/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants",
-            "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/phd-exploratory-work/data/elephants/human_absent",
+            "non_hybrid_dir" : "aohs",
+            "hybrid_dir" : "aohs_hybrid",
+            "current_aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s/current",
+            "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s/human_absent",
             "hunting_preds_dir" : "/Users/emiliolr/Desktop/hunting_testing",
             "tropical_mammals_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv"
         },
         "remote" : {
-            "current_aoh_dir" : "/maps/mwd24/life25/aohs/current/MAMMALIA",
-            "human_absent_aoh_dir" : "/maps/mwd24/life25/aohs/pnv/MAMMALIA",
+            "non_hybrid_dir" : "life25",
+            "hybrid_dir" : "food25",
+            "current_aoh_dir" : "/maps/mwd24/%s/aohs/current/MAMMALIA",
+            "human_absent_aoh_dir" : "/maps/mwd24/%s/aohs/pnv/MAMMALIA",
             "hunting_preds_dir" : "/maps/el590/hunting_pressure_maps",
             "tropical_mammals_fp" : "/maps/el590/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv"
         }
