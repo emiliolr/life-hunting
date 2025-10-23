@@ -27,6 +27,27 @@ def bm_cats(bm):
     else:
         return 'large'
 
+def aoh_extinction_curve(aoh_hum_abs, aoh_new, curve_type = 'power_law', z = 0.25, a = 2.5, b = -14.5, 
+                         alpha = 1, np_careful = False):
+    assert curve_type in ['power_law', 'gompertz'], f'Curve type "{curve_type}" not supported'
+
+    #  everything here v carefully uses Float64 for operations, to avoid errors w/small numbers
+    if curve_type == 'power_law':
+        if np_careful:
+            prob_extinction = np.subtract(np.float64(1), np.float_power(np.divide(aoh_new, aoh_hum_abs), z))
+        else:
+            prob_extinction = 1 - ((aoh_new / aoh_hum_abs) ** z)
+    elif curve_type == 'gompertz':
+        if np_careful:
+            prob_extinction = np.subtract(np.float64(1), np.exp(np.multiply(np.float64(-1), np.exp(np.add(np.float64(a), np.multiply(np.float64(b), np.float_power(np.divide(aoh_new, aoh_hum_abs), alpha)))))))
+        else:
+            prob_extinction = 1 - (np.exp(-1 * np.exp(a + b * ((aoh_new / aoh_hum_abs) ** alpha))))
+
+    #  clip values to 0-1 range so they're probabilities
+    prob_extinction = np.clip(prob_extinction, a_min = 0, a_max = 1)
+
+    return prob_extinction
+
 def main(params, mode):
     # Parsing parameters passed in via JSON
     iucn_ids = params['iucn_id_subset']
@@ -40,8 +61,11 @@ def main(params, mode):
     if facet_body_mass:
         assert map_type in ['hunting_pressure', 'species_richness'], f'Faceting by body mass not supported for map type {map_type}.'
 
-    valid_map_types = ['species_richness', 'hunting_pressure', 'joint_aoh_effect', 'partial_aoh_effects']
+    valid_map_types = ['species_richness', 'hunting_pressure', 'joint_aoh_effect', 'partial_aoh_effects', 'restore_and_abate']
     assert map_type in valid_map_types, f'{map_type} not currently supported.'
+
+    if map_type == 'restore_and_abate':
+        sys.exit()
 
     #  file paths
     filepaths = params['filepaths'][mode]
@@ -105,13 +129,17 @@ def main(params, mode):
             body_mass_cats.append(bm_cat)
 
     # Reading in the template raster (extent of tropical forest zone, resolution + projection of AOHs)
-    if map_type != 'partial_aoh_effects':
+    if map_type in ['species_richness', 'hunting_pressure', 'joint_aoh_effect']:
         if not facet_body_mass:
             template_raster = rxr.open_rasterio(template_raster_fp)
         else:
             templates = {bm_cat : rxr.open_rasterio(template_raster_fp) for bm_cat in np.unique(body_mass_cats)}
-    else:
+    elif map_type == 'partial_aoh_effects':
         template_raster_hunt, template_raster_hab = rxr.open_rasterio(template_raster_fp), rxr.open_rasterio(template_raster_fp)
+    elif map_type == 'restore_and_abate':
+        template_raster_abate = rxr.open_rasterio(template_raster_fp)
+        template_raster_restore = rxr.open_rasterio(template_raster_fp)
+        template_raster_abate_restore = rxr.open_rasterio(template_raster_fp)
 
     # Iteratively processing AOHs/hunting pressure maps for each tropical species
     print(f'Aggregating across {len(filtered_iucn_ids)} species for map type "{map_type}"' + (f' ({"current" if current else "human_absent"})' if map_type == 'species_richness' else ''))
@@ -122,14 +150,14 @@ def main(params, mode):
         sp = filtered_iucn_ids[i]
         bm_cat = body_mass_cats[i] if facet_body_mass else None
 
-        if map_type not in ['joint_aoh_effect', 'partial_aoh_effects']:
+        if map_type not in ['species_richness', 'hunting_pressure']:
             if map_type == 'species_richness':
                 sp_fp = os.path.join(cur_aoh_dir if current else hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
             elif map_type == 'hunting_pressure':
                 sp_fp = os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
 
             sp_raster = rxr.open_rasterio(sp_fp)
-        else:
+        elif map_type in ['joint_aoh_effect', 'partial_aoh_effects', 'abate_and_restore']:
             #  read in needed rasters
             cur_aoh_fp = os.path.join(cur_aoh_dir, f'{sp}_RESIDENT.tif')
             hum_abs_aoh_fp = os.path.join(hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
@@ -161,7 +189,7 @@ def main(params, mode):
             if map_type == 'joint_aoh_effect':
                 sp_raster = delta_aoh_tot.where(hum_abs_aoh != 0) / hum_abs_aoh
             #  partial out the joint effect to hunting + habitat loss based on independent effects
-            else:
+            elif map_type in ['partial_aoh_effects', 'abate_and_restore']:
                 #  get AOH effect of just hunting
                 hp_abs = hp_abs.rio.reproject_match(hum_abs_aoh)
 
@@ -174,15 +202,49 @@ def main(params, mode):
                 effective_aoh_abs = effective_aoh_abs.rio.reproject_match(hum_abs_aoh).fillna(0)
                 cur_aoh = cur_aoh.rio.reproject_match(hum_abs_aoh).fillna(0)
 
-                #  get partial effects using shapley(-ish) values
-                sp_raster_hunt = shapley_ish_value(hum_abs_aoh, effective_aoh_abs, cur_aoh, effective_aoh_cur)
-                sp_raster_hab = shapley_ish_value(hum_abs_aoh, cur_aoh, effective_aoh_abs, effective_aoh_cur)
+                if map_type == 'partial_aoh_effects':
+                    #  get partial effects using shapley(-ish) values
+                    sp_raster_hunt = shapley_ish_value(hum_abs_aoh, effective_aoh_abs, cur_aoh, effective_aoh_cur)
+                    sp_raster_hab = shapley_ish_value(hum_abs_aoh, cur_aoh, effective_aoh_abs, effective_aoh_cur)
 
-                #  divide through by the total delta AOH (summed across AOH)
-                sp_raster_hunt = sp_raster_hunt.where(hum_abs_aoh != 0) / hum_abs_aoh
-                sp_raster_hab = sp_raster_hab.where(hum_abs_aoh != 0) / hum_abs_aoh
+                    #  divide through by the total delta AOH (summed across AOH)
+                    sp_raster_hunt = sp_raster_hunt.where(hum_abs_aoh != 0) / hum_abs_aoh
+                    sp_raster_hab = sp_raster_hab.where(hum_abs_aoh != 0) / hum_abs_aoh
+                elif map_type == 'abate_and_restore':
+                    #  cast everything to Float64 to ensure precision in operations & make sure that when we 
+                    #   take the difference, comparisons are made everywhere (doesn't happen if one layers has null values 
+                    #   but not the other)
+                    hum_abs_aoh = hum_abs_aoh.astype('float64').fillna(0)
+                    cur_aoh = cur_aoh.astype('float64').fillna(0)
+                    effective_aoh_abs = effective_aoh_abs.astype('float64').fillna(0)
+                    effective_aoh_cur = effective_aoh_cur.astype('float64').fillna(0)
 
-        if map_type != 'partial_aoh_effects':
+                    #  the delta AOH in each pixel
+                    delta_aoh_tot = hum_abs_aoh - effective_aoh_cur
+                    delta_aoh_restore = effective_aoh_abs - effective_aoh_cur
+                    delta_aoh_abate = cur_aoh - effective_aoh_cur
+
+                    #  getting needed total AOHs
+                    hum_abs_aoh_tot = hum_abs_aoh.sum()
+                    effective_aoh_cur_tot = effective_aoh_cur.sum()
+                    p0 = aoh_extinction_curve(hum_abs_aoh_tot, effective_aoh_cur_tot, np_careful = True)
+
+                    #  the effect when you restore/abate in each pixel
+                    abate_restore_aoh_tot = effective_aoh_cur_tot + delta_aoh_tot
+                    p1 = aoh_extinction_curve(hum_abs_aoh_tot, abate_restore_aoh_tot, np_careful = True)
+                    sp_raster_abate_restore = p1 - p0
+
+                    #  the effect of JUST abating in each pixel
+                    abate_aoh_tot = effective_aoh_cur_tot + delta_aoh_abate
+                    p1 = aoh_extinction_curve(hum_abs_aoh_tot, abate_aoh_tot, np_careful = True)
+                    sp_raster_abate = p1 - p0
+
+                    #  the effect of JUST restoring in each pixel
+                    restore_aoh_tot = effective_aoh_cur_tot + delta_aoh_restore
+                    p1 = aoh_extinction_curve(hum_abs_aoh_tot, restore_aoh_tot, np_careful = True)
+                    sp_raster_restore = p1 - p0
+
+        if map_type not in ['partial_aoh_effects', 'abate_and_restore']:
             sp_raster = sp_raster.rio.reproject_match(template_raster if not facet_body_mass else templates[bm_cat]).fillna(0) # reproject to match template exactly
 
             #  turn into a binary AOH map, only for species richness
@@ -197,12 +259,21 @@ def main(params, mode):
                 template_raster = template_raster + sp_raster # add to running aggregated raster
             else:
                 templates[bm_cat] = templates[bm_cat] + sp_raster # add to raster of the body mass category
-        else:
+        elif map_type == 'partial_aoh_effects':
             sp_raster_hunt = sp_raster_hunt.rio.reproject_match(template_raster_hunt).fillna(0)
             template_raster_hunt = template_raster_hunt + sp_raster_hunt
 
             sp_raster_hab = sp_raster_hab.rio.reproject_match(template_raster_hab).fillna(0)
             template_raster_hab = template_raster_hab + sp_raster_hab
+        elif map_type == 'abate_and_restore':
+            sp_raster_abate_restore = sp_raster_abate_restore.rio.reproject_match(template_raster_abate_restore).fillna(0)
+            template_raster_abate_restore = template_raster_abate_restore + sp_raster_abate_restore
+
+            sp_raster_abate = sp_raster_abate.rio.reproject_match(template_raster_abate).fillna(0)
+            template_raster_abate = template_raster_abate + sp_raster_abate
+
+            sp_raster_restore = sp_raster_restore.rio.reproject_match(template_raster_restore).fillna(0)
+            template_raster_restore = template_raster_restore + sp_raster_restore
 
     print()
     print('Applying postprocessing')
