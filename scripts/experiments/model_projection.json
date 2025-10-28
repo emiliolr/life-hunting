@@ -1,10 +1,10 @@
 {
-    "model_to_use" : "rf-3part",
+    "model_to_use" : "rf-pca",
     "save_raster" : 1,
     "num_cores" : 1,
-    "current_aoh" : 1,
+    "current_aoh" : 0,
     "hybrid_hab_map" : 0,
-    "iucn_id_subset" : [10007, 10259, 10300, 10548, 11509],
+    "iucn_id_subset" : [10300, 11509],
     "filepaths" : {
         "local" : {
             "base_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE",
@@ -13,7 +13,7 @@
             "non_hybrid_dir" : "aohs",
             "hybrid_dir" : "aohs_hybrid",
             "current_aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s/current",
-            "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s/human_absent",
+            "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s/pnv",
             "mammals_data_fp" : "datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_extended_w_pca.csv",
             "tropical_mammals_fp" : "datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv",
             "model_dir" : "hunting_analysis/final_models",

@@ -64,9 +64,6 @@ def main(params, mode):
     valid_map_types = ['species_richness', 'hunting_pressure', 'joint_aoh_effect', 'partial_aoh_effects', 'restore_and_abate']
     assert map_type in valid_map_types, f'{map_type} not currently supported.'
 
-    if map_type == 'restore_and_abate':
-        sys.exit()
-
     #  file paths
     filepaths = params['filepaths'][mode]
 
@@ -96,6 +93,10 @@ def main(params, mode):
     elif map_type == 'partial_aoh_effects':
         save_fps = {'hunting' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hunting_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
                     'habitat_loss' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hab_loss_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')}
+    elif map_type == 'restore_and_abate':
+        save_fps = {'restore_and_abate' : os.path.join(save_dir, f'tropical_species_aggregate_restore_and_abate_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
+                    'restore' : os.path.join(save_dir, f'tropical_species_aggregate_restore_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
+                    'abate' : os.path.join(save_dir, f'tropical_species_aggregate_abate_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')}
 
     # Reading in the tropical mammal data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
@@ -137,9 +138,9 @@ def main(params, mode):
     elif map_type == 'partial_aoh_effects':
         template_raster_hunt, template_raster_hab = rxr.open_rasterio(template_raster_fp), rxr.open_rasterio(template_raster_fp)
     elif map_type == 'restore_and_abate':
-        template_raster_abate = rxr.open_rasterio(template_raster_fp)
-        template_raster_restore = rxr.open_rasterio(template_raster_fp)
-        template_raster_abate_restore = rxr.open_rasterio(template_raster_fp)
+        template_raster_abate = rxr.open_rasterio(template_raster_fp).astype('float64')
+        template_raster_restore = rxr.open_rasterio(template_raster_fp).astype('float64')
+        template_raster_abate_restore = rxr.open_rasterio(template_raster_fp).astype('float64')
 
     # Iteratively processing AOHs/hunting pressure maps for each tropical species
     print(f'Aggregating across {len(filtered_iucn_ids)} species for map type "{map_type}"' + (f' ({"current" if current else "human_absent"})' if map_type == 'species_richness' else ''))
@@ -150,14 +151,14 @@ def main(params, mode):
         sp = filtered_iucn_ids[i]
         bm_cat = body_mass_cats[i] if facet_body_mass else None
 
-        if map_type not in ['species_richness', 'hunting_pressure']:
+        if map_type in ['species_richness', 'hunting_pressure']:
             if map_type == 'species_richness':
                 sp_fp = os.path.join(cur_aoh_dir if current else hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
             elif map_type == 'hunting_pressure':
                 sp_fp = os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
 
             sp_raster = rxr.open_rasterio(sp_fp)
-        elif map_type in ['joint_aoh_effect', 'partial_aoh_effects', 'abate_and_restore']:
+        elif map_type in ['joint_aoh_effect', 'partial_aoh_effects', 'restore_and_abate']:
             #  read in needed rasters
             cur_aoh_fp = os.path.join(cur_aoh_dir, f'{sp}_RESIDENT.tif')
             hum_abs_aoh_fp = os.path.join(hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
@@ -189,7 +190,7 @@ def main(params, mode):
             if map_type == 'joint_aoh_effect':
                 sp_raster = delta_aoh_tot.where(hum_abs_aoh != 0) / hum_abs_aoh
             #  partial out the joint effect to hunting + habitat loss based on independent effects
-            elif map_type in ['partial_aoh_effects', 'abate_and_restore']:
+            elif map_type in ['partial_aoh_effects', 'restore_and_abate']:
                 #  get AOH effect of just hunting
                 hp_abs = hp_abs.rio.reproject_match(hum_abs_aoh)
 
@@ -210,7 +211,7 @@ def main(params, mode):
                     #  divide through by the total delta AOH (summed across AOH)
                     sp_raster_hunt = sp_raster_hunt.where(hum_abs_aoh != 0) / hum_abs_aoh
                     sp_raster_hab = sp_raster_hab.where(hum_abs_aoh != 0) / hum_abs_aoh
-                elif map_type == 'abate_and_restore':
+                elif map_type == 'restore_and_abate':
                     #  cast everything to Float64 to ensure precision in operations & make sure that when we 
                     #   take the difference, comparisons are made everywhere (doesn't happen if one layers has null values 
                     #   but not the other)
@@ -244,7 +245,7 @@ def main(params, mode):
                     p1 = aoh_extinction_curve(hum_abs_aoh_tot, restore_aoh_tot, np_careful = True)
                     sp_raster_restore = p1 - p0
 
-        if map_type not in ['partial_aoh_effects', 'abate_and_restore']:
+        if map_type not in ['partial_aoh_effects', 'restore_and_abate']:
             sp_raster = sp_raster.rio.reproject_match(template_raster if not facet_body_mass else templates[bm_cat]).fillna(0) # reproject to match template exactly
 
             #  turn into a binary AOH map, only for species richness
@@ -265,7 +266,7 @@ def main(params, mode):
 
             sp_raster_hab = sp_raster_hab.rio.reproject_match(template_raster_hab).fillna(0)
             template_raster_hab = template_raster_hab + sp_raster_hab
-        elif map_type == 'abate_and_restore':
+        elif map_type == 'restore_and_abate':
             sp_raster_abate_restore = sp_raster_abate_restore.rio.reproject_match(template_raster_abate_restore).fillna(0)
             template_raster_abate_restore = template_raster_abate_restore + sp_raster_abate_restore
 
@@ -282,15 +283,19 @@ def main(params, mode):
     tropical_zone = gpd.read_file(tropical_zone_fp)
     tropical_zone = [tropical_zone.geometry.iloc[0]]
 
-    if map_type != 'partial_aoh_effects':
+    if map_type not in ['partial_aoh_effects', 'restore_and_abate']:
         if not facet_body_mass:
             agg_raster = template_raster.rio.clip(tropical_zone, all_touched = True)
         else:
             for k in templates.keys():
                 templates[k] = templates[k].rio.clip(tropical_zone, all_touched = True)
-    else:
+    elif map_type == 'partial_aoh_effects':
         agg_raster_hunt = template_raster_hunt.rio.clip(tropical_zone, all_touched = True)
         agg_raster_hab = template_raster_hab.rio.clip(tropical_zone, all_touched = True)
+    elif map_type == 'restore_and_abate':
+        agg_raster_abate_restore = template_raster_abate_restore.rio.clip(tropical_zone, all_touched = True)
+        agg_raster_abate = template_raster_abate.rio.clip(tropical_zone, all_touched = True)
+        agg_raster_restore = template_raster_restore.rio.clip(tropical_zone, all_touched = True)
 
     if map_type == 'species_richness':
         if not facet_body_mass:
@@ -322,11 +327,11 @@ def main(params, mode):
 
     # Also, mask by nan mask from predictor raster to remove artifacts where there shouldn't be
     #   any predictions
-    if map_type in ['hunting_pressure', 'joint_aoh_effect', 'partial_aoh_effects']:
+    if map_type != 'species_richness':
         pred_stack = rxr.open_rasterio(pred_stack_fp)
         pred_stack = xr.ufuncs.isnan(pred_stack).astype(int).sum(dim = 'band') # see where there are nans in any band
 
-        if map_type != 'partial_aoh_effects':
+        if map_type not in ['partial_aoh_effects', 'restore_and_abate']:
             if not facet_body_mass:
                 pred_stack = pred_stack.rio.reproject_match(agg_raster)
                 agg_raster = agg_raster.where(pred_stack == 0)
@@ -334,25 +339,41 @@ def main(params, mode):
                 for k in templates.keys():
                     pred_stack = pred_stack.rio.reproject_match(templates[k])
                     templates[k] = templates[k].where(pred_stack == 0)
-        else:
+        elif map_type == 'partial_aoh_effects':
             pred_stack = pred_stack.rio.reproject_match(agg_raster_hunt)
+
             agg_raster_hunt = agg_raster_hunt.where(pred_stack == 0)
             agg_raster_hab = agg_raster_hab.where(pred_stack == 0)
+        elif map_type == 'restore_and_abate':
+            pred_stack = pred_stack.rio.reproject_match(agg_raster_abate_restore)
+
+            agg_raster_abate_restore = agg_raster_abate_restore.where(pred_stack == 0)
+            agg_raster_abate = agg_raster_abate.where(pred_stack == 0)
+            agg_raster_restore = agg_raster_restore.where(pred_stack == 0)
 
     # Saving the final aggregated raster
     print('Saving results')
 
-    dtype = 'uint16' if map_type == 'species_richness' else 'float32'
+    if map_type == 'species_richness':
+        dtype = 'uint16'
+    elif map_type in ['hunting_pressure', 'joint_aoh_effect', 'partial_aoh_effects']:
+        dtype = 'float32'
+    elif map_type == 'restore_and_abate':
+        dtype = 'float64'
 
-    if map_type != 'partial_aoh_effects':
+    if map_type not in ['partial_aoh_effects', 'restore_and_abate']:
         if not facet_body_mass:
             agg_raster.rio.to_raster(save_fp % '', dtype = dtype)
         else:
             for k in templates.keys():
                 templates[k].rio.to_raster(save_fp % ('_' + k.replace(' ', '_')), dtype = dtype)
-    else:
+    elif map_type == 'partial_aoh_effects':
         agg_raster_hunt.rio.to_raster(save_fps['hunting'] % '', dtype = dtype)
         agg_raster_hab.rio.to_raster(save_fps['habitat_loss'] % '', dtype = dtype)
+    elif map_type == 'restore_and_abate':
+        agg_raster_abate_restore.rio.to_raster(save_fps['restore_and_abate'] % '', dtype = dtype)
+        agg_raster_abate.rio.to_raster(save_fps['abate'] % '', dtype = dtype)
+        agg_raster_restore.rio.to_raster(save_fps['restore'] % '', dtype = dtype)
 
 if __name__ == '__main__':
     # Read in parameters
@@ -360,7 +381,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'remote'
+    mode = 'local'
     print(f'Running in {mode} mode\n')
 
     main(params, mode)

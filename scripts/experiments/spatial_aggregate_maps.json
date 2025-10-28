@@ -1,7 +1,7 @@
 {
-    "iucn_id_subset" : [],
-    "map_type" : "species_richness",
-    "model_to_use" : "rf-3part",
+    "iucn_id_subset" : [10300, 11509],
+    "map_type" : "restore_and_abate",
+    "model_to_use" : "rf-pca",
     "current" : 1,
     "no_increase" : 0,
     "facet_body_mass" : 0,
