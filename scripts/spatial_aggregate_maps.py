@@ -351,6 +351,15 @@ def main(params, mode):
             agg_raster_abate = agg_raster_abate.where(pred_stack == 0)
             agg_raster_restore = agg_raster_restore.where(pred_stack == 0)
 
+    # Divide through by the cell area (in km^2), only for abate/restore layers 
+    #  to make cell values directly comparable (non-equal area grid)
+    if map_type == 'restore_and_abate':
+        template_cell_area = rxr.open_rasterio(template_raster_fp.replace('.tif', '_cell_area.tif'))
+        
+        agg_raster_abate_restore = agg_raster_abate_restore / template_cell_area
+        agg_raster_abate = agg_raster_abate / template_cell_area
+        agg_raster_restore = agg_raster_restore / template_cell_area
+
     # Saving the final aggregated raster
     print('Saving results')
 

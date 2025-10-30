@@ -1,11 +1,11 @@
 {
     "iucn_id_subset" : [10300, 11509],
     "map_type" : "restore_and_abate",
-    "model_to_use" : "rf-pca",
+    "model_to_use" : "rf-3part",
     "current" : 1,
-    "no_increase" : 0,
+    "no_increase" : 1,
     "facet_body_mass" : 0,
-    "hybrid_hab_map" : 0,
+    "hybrid_hab_map" : 1,
     "filepaths" : {
         "local" : {
             "non_hybrid_dir" : "aohs",
