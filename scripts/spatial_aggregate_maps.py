@@ -96,7 +96,8 @@ def main(params, mode):
     elif map_type == 'restore_and_abate':
         save_fps = {'restore_and_abate' : os.path.join(save_dir, f'tropical_species_aggregate_restore_and_abate_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
                     'restore' : os.path.join(save_dir, f'tropical_species_aggregate_restore_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
-                    'abate' : os.path.join(save_dir, f'tropical_species_aggregate_abate_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')}
+                    'abate' : os.path.join(save_dir, f'tropical_species_aggregate_abate_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
+                    'restore_baseline' : os.path.join(save_dir, f'tropical_species_aggregate_restore_baseline_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')}
 
     # Reading in the tropical mammal data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
@@ -140,6 +141,7 @@ def main(params, mode):
     elif map_type == 'restore_and_abate':
         template_raster_abate = rxr.open_rasterio(template_raster_fp).astype('float64')
         template_raster_restore = rxr.open_rasterio(template_raster_fp).astype('float64')
+        template_raster_restore_baseline = rxr.open_rasterio(template_raster_fp).astype('float64')
         template_raster_abate_restore = rxr.open_rasterio(template_raster_fp).astype('float64')
 
     # Iteratively processing AOHs/hunting pressure maps for each tropical species
@@ -224,9 +226,11 @@ def main(params, mode):
                     delta_aoh_tot = hum_abs_aoh - effective_aoh_cur
                     delta_aoh_restore = effective_aoh_abs - effective_aoh_cur
                     delta_aoh_abate = cur_aoh - effective_aoh_cur
+                    delta_aoh_restore_baseline = hum_abs_aoh - cur_aoh
 
                     #  getting needed total AOHs
                     hum_abs_aoh_tot = hum_abs_aoh.sum()
+                    cur_aoh_tot = cur_aoh.sum()
                     effective_aoh_cur_tot = effective_aoh_cur.sum()
                     p0 = aoh_extinction_curve(hum_abs_aoh_tot, effective_aoh_cur_tot, np_careful = True)
 
@@ -244,6 +248,12 @@ def main(params, mode):
                     restore_aoh_tot = effective_aoh_cur_tot + delta_aoh_restore
                     p1 = aoh_extinction_curve(hum_abs_aoh_tot, restore_aoh_tot, np_careful = True)
                     sp_raster_restore = p1 - p0
+
+                    #  the effect of JUST restoring in a world w/o hunting, as a baseline
+                    restore_baseline_aoh_tot = cur_aoh_tot + delta_aoh_restore_baseline
+                    p0 = aoh_extinction_curve(hum_abs_aoh_tot, cur_aoh_tot, np_careful = True)
+                    p1 = aoh_extinction_curve(hum_abs_aoh_tot, restore_baseline_aoh_tot, np_careful = True)
+                    sp_raster_restore_baseline = p1 - p0
 
         if map_type not in ['partial_aoh_effects', 'restore_and_abate']:
             sp_raster = sp_raster.rio.reproject_match(template_raster if not facet_body_mass else templates[bm_cat]).fillna(0) # reproject to match template exactly
@@ -276,6 +286,9 @@ def main(params, mode):
             sp_raster_restore = sp_raster_restore.rio.reproject_match(template_raster_restore).fillna(0)
             template_raster_restore = template_raster_restore + sp_raster_restore
 
+            sp_raster_restore_baseline = sp_raster_restore_baseline.rio.reproject_match(template_raster_restore_baseline).fillna(0)
+            template_raster_restore_baseline = template_raster_restore_baseline + sp_raster_restore_baseline
+
     print()
     print('Applying postprocessing')
 
@@ -296,6 +309,7 @@ def main(params, mode):
         agg_raster_abate_restore = template_raster_abate_restore.rio.clip(tropical_zone, all_touched = True)
         agg_raster_abate = template_raster_abate.rio.clip(tropical_zone, all_touched = True)
         agg_raster_restore = template_raster_restore.rio.clip(tropical_zone, all_touched = True)
+        agg_raster_restore_baseline = template_raster_restore_baseline.rio.clip(tropical_zone, all_touched = True)
 
     if map_type == 'species_richness':
         if not facet_body_mass:
@@ -350,6 +364,7 @@ def main(params, mode):
             agg_raster_abate_restore = agg_raster_abate_restore.where(pred_stack == 0)
             agg_raster_abate = agg_raster_abate.where(pred_stack == 0)
             agg_raster_restore = agg_raster_restore.where(pred_stack == 0)
+            agg_raster_restore_baseline = agg_raster_restore_baseline.where(pred_stack == 0)
 
     # Divide through by the cell area (in km^2), only for abate/restore layers 
     #  to make cell values directly comparable (non-equal area grid)
@@ -359,6 +374,7 @@ def main(params, mode):
         agg_raster_abate_restore = agg_raster_abate_restore / template_cell_area
         agg_raster_abate = agg_raster_abate / template_cell_area
         agg_raster_restore = agg_raster_restore / template_cell_area
+        agg_raster_restore_baseline = agg_raster_restore_baseline / template_cell_area
 
     # Saving the final aggregated raster
     print('Saving results')
@@ -383,6 +399,7 @@ def main(params, mode):
         agg_raster_abate_restore.rio.to_raster(save_fps['restore_and_abate'] % '', dtype = dtype)
         agg_raster_abate.rio.to_raster(save_fps['abate'] % '', dtype = dtype)
         agg_raster_restore.rio.to_raster(save_fps['restore'] % '', dtype = dtype)
+        agg_raster_restore_baseline.rio.to_raster(save_fps['restore_baseline'] % '', dtype = dtype)
 
 if __name__ == '__main__':
     # Read in parameters

@@ -1,5 +1,5 @@
 {
-    "iucn_id_subset" : [10300, 11509],
+    "iucn_id_subset" : [21474],
     "map_type" : "restore_and_abate",
     "model_to_use" : "rf-3part",
     "current" : 1,
