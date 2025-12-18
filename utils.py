@@ -660,8 +660,11 @@ def preprocess_data(data, include_indicators = False, include_categorical = Fals
         continuous_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                               'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
                               'Percent_Settlement_50km', 'Corruption', 'Government_Effectiveness',
-                              'Political_Stability', 'Regulation', 'Rule_of_Law', 'Accountability']
-        special_columns = ['Protected_Area']
+                              'Political_Stability', 'Regulation', 'Rule_of_Law', 'Accountability',
+                              'Forest_Cover', 'NPP', 'Travel_Time_Small']
+        special_columns = ['Protected_Area', 'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 
+                           'IUCN_For_Medicine', 'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 
+                           'IUCN_For_Wearing_Apparel', 'IUCN_Is_Threatened']
         response_column = 'Response_Ratio'
     elif dataset == 'birds':
         indicator_columns = ['Study', 'Dataset', 'Order', 'Family', 'Species',

@@ -293,7 +293,7 @@ def setup_and_train_model(args, data):
             args.model_name = f'{args.flaml_single_model[0]}_three_part_{args.time_budget_mins}mins'
 
     # Preprocess the data
-    pp_data = preprocess_data(data, standardize = True, **pp_args)
+    pp_data = preprocess_data(data, standardize = True, pca_save_fp = '/Users/emiliolr/Desktop/gov_pca.pickle', **pp_args)
 
     # Train the hurdle model
     if args.verbose:

@@ -2,9 +2,9 @@
     "model_to_use" : "rf-3part",
     "save_raster" : 1,
     "num_cores" : 1,
-    "current_aoh" : 0,
-    "hybrid_hab_map" : 1,
-    "iucn_id_subset" : [10300, 11509],
+    "current_aoh" : 1,
+    "hybrid_hab_map" : 0,
+    "iucn_id_subset" : [10300],
     "filepaths" : {
         "local" : {
             "base_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE",

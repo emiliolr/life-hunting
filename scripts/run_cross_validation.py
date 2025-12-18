@@ -70,6 +70,10 @@ def read_data(args):
         data = read_csv_non_utf(ben_lop_path)
     elif args.dataset == 'mammals_recreated':
         data = pd.read_csv(ben_lop_rec_path)
+
+        #  recoding IUCN category to make it a numeric indicator
+        data['IUCN_Is_Threatened'] = data['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
+        data = data.drop(columns = ['IUCN_Category'])
     elif args.dataset == 'mammals_extended':
         data = pd.read_csv(ben_lop_ext_path)
 
@@ -260,9 +264,17 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
             zero_columns = None # just using defaults here, which is all available predictors...
         elif args.dataset == 'mammals_recreated':
             if args.flaml_single_model == ['rf']:
-                zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
-                                'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
-                                'Percent_Settlement_50km', 'Protected_Area']
+                if args.experiment_append == 'extended':
+                    zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                                    'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                                    'Percent_Settlement_50km', 'Protected_Area', 'PC', 'Forest_Cover', 'NPP',
+                                    'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 
+                                    'IUCN_For_Medicine', 'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 
+                                    'IUCN_For_Wearing_Apparel', 'IUCN_Is_Threatened', 'Travel_Time_Small']
+                else:   
+                    zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                                    'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                                    'Percent_Settlement_50km', 'Protected_Area']
             elif args.flaml_single_model == ['rf-gov']:
                 zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                                 'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
@@ -382,9 +394,17 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         args.tune_hurdle_thresh = False
         
         if args.dataset == 'mammals_recreated':
-            pred_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
-                         'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
-                         'Percent_Settlement_50km', 'Protected_Area', 'PC']
+            if args.experiment_append == 'extended':
+                pred_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                             'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                             'Percent_Settlement_50km', 'Protected_Area', 'PC', 'Forest_Cover', 'NPP',
+                             'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 
+                             'IUCN_For_Medicine', 'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 
+                             'IUCN_For_Wearing_Apparel', 'IUCN_Is_Threatened', 'Travel_Time_Small']
+            else:
+                pred_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                            'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                            'Percent_Settlement_50km', 'Protected_Area', 'PC']
             pca_cols = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
                         'Rule_of_Law', 'Accountability']
         else:
@@ -470,7 +490,7 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         fit_args = {'classifier' : class_settings, 
                     'decrease' : decrease_settings,
                     'increase' : increase_settings}
-        pp_args = {'include_indicators' : True,
+        pp_args = {'include_indicators' : False,
                    'include_categorical' : False,
                    'polynomial_features' : 0,
                    'log_trans_cont' : False,
@@ -548,10 +568,10 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
 
         fit_args = automl_settings
         pp_args = {'include_indicators' : False,
-                'include_categorical' : False,
-                'polynomial_features' : 0,
-                'log_trans_cont' : False,
-                'dataset' : args.dataset}
+                  'include_categorical' : False,
+                  'polynomial_features' : 0,
+                  'log_trans_cont' : False,
+                  'dataset' : args.dataset}
 
         #  results saving params
         model_name = f'FLAML_classification_{args.time_budget_mins}mins'
