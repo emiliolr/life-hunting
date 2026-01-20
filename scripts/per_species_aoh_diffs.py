@@ -15,14 +15,21 @@ import numpy as np
 
 import rioxarray as rxr
 import xarray as xr
+import geopandas as gpd
 
-def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir, hunting_preds_dir, model_to_use, no_increase, hybrid_hab_map):
+def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir, hunting_preds_dir, model_to_use, 
+                                 no_increase, hybrid_hab_map, tropical_zone):
     # Reading in the four needed rasters: (1) human-absent AOH, (2) current AOH, (3 + 4) hunting pressure maps
     human_absent_aoh = rxr.open_rasterio(os.path.join(human_absent_aoh_dir, f'{species}_RESIDENT.tif'))
     human_absent_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}.tif'))
 
     current_aoh = rxr.open_rasterio(os.path.join(current_aoh_dir, f'{species}_RESIDENT.tif'))
     current_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}.tif'))
+
+    #  optionally, limiting to just tropical forest portions of AOH
+    if tropical_zone is not None:
+        human_absent_aoh = human_absent_aoh.rio.clip(tropical_zone, all_touched = True).fillna(0) # making sure to set NAs back to 0
+        current_aoh = current_aoh.rio.clip(tropical_zone, all_touched = True).fillna(0)
 
     #  optionally, capping RRs at 1 (no change)
     if no_increase:
@@ -69,11 +76,13 @@ def main(params, mode):
     num_cores = params['num_cores']
     no_increase = params['no_increase']
     hybrid_hab_map = bool(params['hybrid_hab_map'])
+    just_tropical_forest = bool(params['just_tropical_forest'])
 
     #  file paths
     filepaths = params['filepaths'][mode]
 
     tropical_mammals_fp = filepaths['tropical_mammals_fp']
+    tropical_zone_fp = filepaths['tropical_zone_fp']
 
     hunting_preds_dir = filepaths['hunting_preds_dir']
     current_aoh_dir = filepaths['current_aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir'])
@@ -101,6 +110,15 @@ def main(params, mode):
         if (pct_overlap_current > 0) and (pct_overlap_human_absent > 0):
             filtered_iucn_ids.append(sp)
 
+    # Reading the tropical forest extent polygon for masking non-forest pixels
+    print(f'Computing differences {"across full" if not just_tropical_forest else "within tropical forest"} AOH\n')
+
+    if just_tropical_forest:
+        tropical_zone = gpd.read_file(tropical_zone_fp)
+        tropical_zone = [tropical_zone.geometry.iloc[0]]
+    else:
+        tropical_zone = None
+
     # Collecting AOH info for each species in parallel:
     #  1. Human-absent AOH,
     #  2. Current AOH (human-absent + habitat loss),
@@ -112,11 +130,12 @@ def main(params, mode):
                                                                                                  hunting_preds_dir, 
                                                                                                  model_to_use,
                                                                                                  no_increase,
-                                                                                                 hybrid_hab_map) for sp in filtered_iucn_ids)
+                                                                                                 hybrid_hab_map, 
+                                                                                                 tropical_zone) for sp in filtered_iucn_ids)
 
     # Saving the data frame containing different bits of AOH info
     aoh_info_df = pd.DataFrame(aoh_dicts)
-    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_no-increase" if no_increase else ''}{"_hybrid" if hybrid_hab_map else ""}.csv'), index = False)
+    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_just-tropical-forest"}{"_no-increase" if no_increase else ''}{"_hybrid" if hybrid_hab_map else ""}.csv'), index = False)
 
 if __name__ == '__main__':
     # Read in parameters
@@ -124,7 +143,7 @@ if __name__ == '__main__':
         params = json.load(f)
 
     # Choosing either "local" or "remote"
-    mode = 'remote'
+    mode = 'local'
     print(f'Running in {mode} mode\n')
 
     main(params, mode)

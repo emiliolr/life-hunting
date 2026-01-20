@@ -1,17 +1,19 @@
 {
-    "iucn_id_subset" : [],
+    "iucn_id_subset" : [10300, 11509],
     "model_to_use" : "rf-3part",
-    "num_cores" : 64,
+    "num_cores" : 1,
     "no_increase" : 1,
-    "hybrid_hab_map" : 0,
+    "hybrid_hab_map" : 1,
+    "just_tropical_forest" : 1,
     "filepaths" : {
         "local" : {
             "non_hybrid_dir" : "aohs",
             "hybrid_dir" : "aohs_hybrid",
             "current_aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s/current",
-            "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s/human_absent",
+            "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s/pnv",
             "hunting_preds_dir" : "/Users/emiliolr/Desktop/hunting_testing",
-            "tropical_mammals_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass.csv"
+            "tropical_mammals_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv",
+            "tropical_zone_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_forest_extent/tropical_forest_extent.shp"
         },
         "remote" : {
             "non_hybrid_dir" : "life25",
@@ -19,7 +21,8 @@
             "current_aoh_dir" : "/maps/mwd24/%s/aohs/current/MAMMALIA",
             "human_absent_aoh_dir" : "/maps/mwd24/%s/aohs/pnv/MAMMALIA",
             "hunting_preds_dir" : "/maps/el590/hunting_pressure_maps",
-            "tropical_mammals_fp" : "/maps/el590/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv"
+            "tropical_mammals_fp" : "/maps/el590/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv",
+            "tropical_zone_fp" : "/maps/el590/tropical_forest_extent/tropical_forest_extent.shp"
         }
     }
 }

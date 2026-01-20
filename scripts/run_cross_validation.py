@@ -282,9 +282,17 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                                 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
                                 'Rule_of_Law', 'Accountability']
             elif args.flaml_single_model == ['rf-pca']:
-                zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
-                                'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
-                                'Percent_Settlement_50km', 'Protected_Area', 'PC']
+                if args.experiment_append == 'extended':
+                    zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                                    'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                                    'Percent_Settlement_50km', 'Protected_Area', 'PC', 'Forest_Cover', 'NPP',
+                                    'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 
+                                    'IUCN_For_Medicine', 'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 
+                                    'IUCN_For_Wearing_Apparel', 'IUCN_Is_Threatened', 'Travel_Time_Small']
+                else:
+                    zero_columns = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                                    'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                                    'Percent_Settlement_50km', 'Protected_Area', 'PC']
                 pca_cols = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
                             'Rule_of_Law', 'Accountability']
             else:
@@ -407,8 +415,12 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                             'Percent_Settlement_50km', 'Protected_Area', 'PC']
             pca_cols = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
                         'Rule_of_Law', 'Accountability']
+        elif args.dataset == 'mammals':
+            pred_cols = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime', 'LivestockBio', 
+                         'Reserve', 'Literacy']
+            pca_cols = None
         else:
-            raise ValueError('Only "mammals_recreated" is supported right now for the three-part model.')
+            raise ValueError('Only "mammals_recreated" and "mammals" are supported right now for the three-part model.')
 
         classifier_columns = pred_cols
         decrease_columns = pred_cols

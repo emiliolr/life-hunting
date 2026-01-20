@@ -522,17 +522,20 @@ def get_three_part_datasets(pp_data, classes_enc, pred = True, outlier_cutoff = 
         all_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                     'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
                     'Percent_Settlement_50km', 'Protected_Area']
-
-        if indicator_columns is None:
-            indicator_columns = []
-        if classifier_columns is None:
-            classifier_columns = all_cols
-        if decrease_columns is None:
-            decrease_columns = all_cols
-        if increase_columns is None:
-            increase_columns = all_cols
+    elif dataset == 'mammals':
+        all_cols = ['BM', 'DistKm', 'PopDens', 'Stunting', 'TravTime', 'LivestockBio', 
+                    'Reserve', 'Literacy']
     else:
-        raise ValueError('The only supported dataset is "mammals_recreated".')
+        raise ValueError('The only supported dataset for the three-part model are "mammals_recreated" and "mammals".')
+    
+    if indicator_columns is None:
+        indicator_columns = []
+    if classifier_columns is None:
+        classifier_columns = all_cols
+    if decrease_columns is None:
+        decrease_columns = all_cols
+    if increase_columns is None:
+        increase_columns = all_cols
 
     X_class = pp_data[[]].copy(deep = True)
     X_increase = pp_data[[]].copy(deep = True)
@@ -557,7 +560,7 @@ def get_three_part_datasets(pp_data, classes_enc, pred = True, outlier_cutoff = 
 
     # Extracting the inputs/outputs for each of the models in the case where we have labels
     if not pred:
-        resp_col = 'Response_Ratio'
+        resp_col = 'Response_Ratio' if dataset == 'mammals_recreated' else 'ratio'
         ratio = pp_data[resp_col].values
 
         #  get classifier datasets
