@@ -79,6 +79,9 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
     # Putting data in a Pandas DataFrame so the predict function of the hurdle model can grab the right vars
     predictors_tabular_no_nan = pd.DataFrame(predictors_tabular_no_nan, columns = list(predictor_stack_clipped.keys()))
 
+    print(predictors_tabular_no_nan.columns)
+    sys.exit()
+
     #  adding the same (standardized) body mass value to each row
     if model_to_use == 'pymer':
         bm = np.log10(mammals_data['Body_Mass'])

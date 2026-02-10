@@ -210,7 +210,7 @@ def main(params, mode):
                     sp_raster_hunt = shapley_ish_value(hum_abs_aoh, effective_aoh_abs, cur_aoh, effective_aoh_cur)
                     sp_raster_hab = shapley_ish_value(hum_abs_aoh, cur_aoh, effective_aoh_abs, effective_aoh_cur)
 
-                    #  divide through by the total delta AOH (summed across AOH)
+                    #  divide through by the total human-absent AOH in the cell
                     sp_raster_hunt = sp_raster_hunt.where(hum_abs_aoh != 0) / hum_abs_aoh
                     sp_raster_hab = sp_raster_hab.where(hum_abs_aoh != 0) / hum_abs_aoh
                 elif map_type == 'restore_and_abate':

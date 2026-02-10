@@ -296,12 +296,16 @@ def wasserstein_distance_range(y_true, y_pred, lower_bound = 0, upper_bound = 2)
     return wd_range
 
 if __name__ == '__main__':
-    import pandas as pd
-
     np.random.seed(123)
 
-    RRs = np.abs(np.random.normal(0.75, 0.5, 100))
-    print(RRs)
+    rr_pred_A = np.abs(np.random.normal(0.75, 0.5, 100))
+    rr_pred_B = np.abs(np.random.normal(0.25, 0.2, 100))
+    rr_pred_C = np.repeat(0.5, 100)
 
-    DIs = pd.Series(get_DI_cats(RRs, neighborhood = 0.05))
-    print(DIs.value_counts())
+    rr_actual = np.abs(np.random.normal(0.25, 0.2, 100))
+
+    print(wasserstein_distance_range(rr_pred_A, rr_actual))
+    print(wasserstein_distance_range(rr_pred_B, rr_actual))
+    print(wasserstein_distance_range(rr_pred_C, rr_actual))
+
+    print(wasserstein_distance_range(rr_actual, rr_actual))
