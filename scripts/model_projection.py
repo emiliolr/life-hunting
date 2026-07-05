@@ -4,6 +4,7 @@ import os
 import os.path
 import warnings
 import json
+import glob
 
 sys.path.append('..')
 warnings.simplefilter(action = 'ignore', category = FutureWarning)
@@ -23,13 +24,20 @@ import xarray as xr
 import geopandas as gpd
 
 def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical_zone, mammals_data, model,
-                            model_to_use, aoh_dir, save_raster, save_dir, error_fp):
+                            model_to_use, aoh_dir, save_raster, save_dir, error_fp, hybrid_hab_map):
     # Get the species' name + body mass
     species_row = tropical_mammals[tropical_mammals['iucn_id'] == species]
     species_bm = species_row['combine_body_mass'].iloc[0]
 
     # Reading in the relevant AOH
-    aoh_fp = os.path.join(aoh_dir, f'{species}_RESIDENT.tif')
+    if hybrid_hab_map:
+        aoh_poss_fps = glob.glob(os.path.join(aoh_dir, f'aoh_T{species}A*_RESIDENT.tif'))
+        if len(aoh_poss_fps) != 1:
+            return species, -2
+        aoh_fp = aoh_poss_fps[0]
+    else:
+        aoh_fp = os.path.join(aoh_dir, f'{species}_RESIDENT.tif')
+
     if not os.path.isfile(aoh_fp):
       return species, -2
 
@@ -79,9 +87,6 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
     # Putting data in a Pandas DataFrame so the predict function of the hurdle model can grab the right vars
     predictors_tabular_no_nan = pd.DataFrame(predictors_tabular_no_nan, columns = list(predictor_stack_clipped.keys()))
 
-    print(predictors_tabular_no_nan.columns)
-    sys.exit()
-
     #  adding the same (standardized) body mass value to each row
     if model_to_use == 'pymer':
         bm = np.log10(mammals_data['Body_Mass'])
@@ -126,8 +131,8 @@ def main(params, mode):
     num_cores = params['num_cores']
 
     current_aoh = params['current_aoh']
-    hybrid_hab_map = params['hybrid_hab_map']
-
+    hybrid_hab_map = bool(params['hybrid_hab_map'])
+    
     #  a subset of iucn IDs, for testing (if empty, will loop over all IDs)
     iucn_ids = params['iucn_id_subset']
 
@@ -247,7 +252,8 @@ def main(params, mode):
                                                                                                   aoh_dir,
                                                                                                   save_raster,
                                                                                                   save_dir, 
-                                                                                                  error_fp) for species in iucn_ids)
+                                                                                                  error_fp,
+                                                                                                  hybrid_hab_map) for species in iucn_ids)
     
     # Adding the percent overlap stats to the tropical mammal dataset + saving
     aoh_pct_overlap = pd.DataFrame(aoh_pct_overlap, columns = ['iucn_id', 'aoh_pct_overlap'])

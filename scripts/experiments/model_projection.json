@@ -1,24 +1,24 @@
 {
     "model_to_use" : "rf-3part",
     "save_raster" : 1,
-    "num_cores" : 1,
-    "current_aoh" : 1,
-    "hybrid_hab_map" : 0,
-    "iucn_id_subset" : [10300],
+    "num_cores" : 8,
+    "current_aoh" : 0,
+    "hybrid_hab_map" : 1,
+    "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {
             "base_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE",
             "predictor_stack_fp" : "datasets/derived_datasets/hunting_predictor_stack/hunting_predictor_stack_governance_pca.tif",
             "tropical_zone_fp" : "datasets/derived_datasets/tropical_forest_extent/tropical_forest_extent.shp",
-            "non_hybrid_dir" : "aohs",
-            "hybrid_dir" : "aohs_hybrid",
-            "current_aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s/current",
-            "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s/pnv",
+            "non_hybrid_dir" : "aohs_non_hybrid",
+            "hybrid_dir" : "aohs_frac_hybrid",
+            "current_aoh_dir" : "/Users/emiliolr/Desktop/mammal_aohs/%s/current",
+            "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/mammal_aohs/%s/pnv",
             "mammals_data_fp" : "datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_extended_w_pca.csv",
             "tropical_mammals_fp" : "datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv",
             "model_dir" : "hunting_analysis/final_models",
-            "save_dir" : "/Users/emiliolr/Desktop/hunting_testing",
-            "error_fp" : "/Users/emiliolr/Desktop/hunting_testing/ERROR_SPECIES.txt"
+            "save_dir" : "/Users/emiliolr/Desktop/hunting_revision_results/hunting_pressure_maps",
+            "error_fp" : "/Users/emiliolr/Desktop/hunting_revision_results/ERROR_SPECIES.txt"
         },
         "remote" : {
             "base_fp" : "/maps/el590",

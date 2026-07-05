@@ -1,22 +1,22 @@
 {
-    "iucn_id_subset" : [181007989],
-    "map_type" : "restore_and_abate",
-    "model_to_use" : "rf-pca",
+    "iucn_id_subset" : [],
+    "map_type" : "hunting_pressure",
+    "model_to_use" : "rf-3part",
     "current" : 1,
     "no_increase" : 0,
     "facet_body_mass" : 0,
-    "hybrid_hab_map" : 0,
+    "hybrid_hab_map" : 1,
     "filepaths" : {
         "local" : {
-            "non_hybrid_dir" : "aohs",
-            "hybrid_dir" : "aohs_hybrid",
-            "aoh_dir" : "/Users/emiliolr/Desktop/hunting_testing/%s",
+            "non_hybrid_dir" : "aohs_non_hybrid",
+            "hybrid_dir" : "aohs_frac_hybrid",
+            "aoh_dir" : "/Users/emiliolr/Desktop/mammal_aohs/%s",
             "tropical_mammals_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv",
             "template_raster_fp" : "/Users/emiliolr/Desktop/template_raster.tif",
             "tropical_zone_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_forest_extent/tropical_forest_extent.shp",
-            "hunting_preds_dir" : "/Users/emiliolr/Desktop/hunting_testing",
+            "hunting_preds_dir" : "/Users/emiliolr/Desktop/hunting_revision_results/hunting_pressure_maps",
             "pred_stack_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/hunting_predictor_stack/hunting_predictor_stack_governance_pca.tif",
-            "save_dir" : "/Users/emiliolr/Desktop/hunting_testing"
+            "save_dir" : "/Users/emiliolr/Desktop/hunting_revision_results"
         },
         "remote" : {
             "non_hybrid_dir" : "life25",

@@ -2,6 +2,7 @@ import sys
 import os
 import json
 import time
+import glob
 
 sys.path.append('..')
 
@@ -155,15 +156,26 @@ def main(params, mode):
 
         if map_type in ['species_richness', 'hunting_pressure']:
             if map_type == 'species_richness':
-                sp_fp = os.path.join(cur_aoh_dir if current else hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
+                if hybrid_hab_map:
+                    sp_poss_fps = glob.glob(os.path.join(cur_aoh_dir if current else hum_abs_aoh_dir, f'aoh_T{sp}A*_RESIDENT.tif'))
+                    sp_fp = sp_poss_fps[0]
+                else:
+                    sp_fp = os.path.join(cur_aoh_dir if current else hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
             elif map_type == 'hunting_pressure':
                 sp_fp = os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
 
             sp_raster = rxr.open_rasterio(sp_fp)
         elif map_type in ['joint_aoh_effect', 'partial_aoh_effects', 'restore_and_abate']:
             #  read in needed rasters
-            cur_aoh_fp = os.path.join(cur_aoh_dir, f'{sp}_RESIDENT.tif')
-            hum_abs_aoh_fp = os.path.join(hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
+            if hybrid_hab_map:
+                cur_aoh_poss_fps = glob.glob(os.path.join(cur_aoh_dir, f'aoh_T{sp}A*_RESIDENT.tif'))
+                cur_aoh_fp = cur_aoh_poss_fps[0]
+
+                hum_abs_aoh_poss_fps = glob.glob(os.path.join(hum_abs_aoh_dir, f'aoh_T{sp}A*_RESIDENT.tif'))
+                hum_abs_aoh_fp = hum_abs_aoh_poss_fps[0]
+            else:
+                cur_aoh_fp = os.path.join(cur_aoh_dir, f'{sp}_RESIDENT.tif')
+                hum_abs_aoh_fp = os.path.join(hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
             hp_cur_fp = os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
             hp_abs_fp = os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
 

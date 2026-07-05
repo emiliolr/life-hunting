@@ -2,6 +2,7 @@ import sys
 import os
 import warnings
 import json
+import glob
 
 sys.path.append('..')
 warnings.simplefilter(action = 'ignore', category = FutureWarning)
@@ -20,10 +21,20 @@ import geopandas as gpd
 def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir, hunting_preds_dir, model_to_use, 
                                  no_increase, hybrid_hab_map, tropical_zone):
     # Reading in the four needed rasters: (1) human-absent AOH, (2) current AOH, (3 + 4) hunting pressure maps
-    human_absent_aoh = rxr.open_rasterio(os.path.join(human_absent_aoh_dir, f'{species}_RESIDENT.tif'))
+    if hybrid_hab_map:
+        human_absent_aoh_poss_fps = glob.glob(os.path.join(human_absent_aoh_dir, f'aoh_T{species}A*_RESIDENT.tif'))
+        human_absent_aoh_fp = human_absent_aoh_poss_fps[0]
+    else:
+        human_absent_aoh_fp = os.path.join(human_absent_aoh_dir, f'{species}_RESIDENT.tif')
+    human_absent_aoh = rxr.open_rasterio(human_absent_aoh_fp)
     human_absent_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}.tif'))
 
-    current_aoh = rxr.open_rasterio(os.path.join(current_aoh_dir, f'{species}_RESIDENT.tif'))
+    if hybrid_hab_map:
+        current_aoh_poss_fps = glob.glob(os.path.join(current_aoh_dir, f'aoh_T{species}A*_RESIDENT.tif'))
+        current_aoh_fp = current_aoh_poss_fps[0]
+    else:
+        current_aoh_fp = os.path.join(current_aoh_dir, f'{species}_RESIDENT.tif')
+    current_aoh = rxr.open_rasterio(current_aoh_fp)
     current_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}.tif'))
 
     #  optionally, limiting to just tropical forest portions of AOH
@@ -135,7 +146,7 @@ def main(params, mode):
 
     # Saving the data frame containing different bits of AOH info
     aoh_info_df = pd.DataFrame(aoh_dicts)
-    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_just-tropical-forest"}{"_no-increase" if no_increase else ''}{"_hybrid" if hybrid_hab_map else ""}.csv'), index = False)
+    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_just-tropical-forest" if just_tropical_forest else ""}{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.csv'), index = False)
 
 if __name__ == '__main__':
     # Read in parameters
