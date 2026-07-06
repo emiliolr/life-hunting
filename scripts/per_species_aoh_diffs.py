@@ -19,7 +19,7 @@ import xarray as xr
 import geopandas as gpd
 
 def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir, hunting_preds_dir, model_to_use, 
-                                 no_increase, hybrid_hab_map, tropical_zone):
+                                 no_increase, hybrid_hab_map, tropical_zone, aoa):
     # Reading in the four needed rasters: (1) human-absent AOH, (2) current AOH, (3 + 4) hunting pressure maps
     if hybrid_hab_map:
         human_absent_aoh_poss_fps = glob.glob(os.path.join(human_absent_aoh_dir, f'aoh_T{species}A*_RESIDENT.tif'))
@@ -37,39 +37,50 @@ def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir,
     current_aoh = rxr.open_rasterio(current_aoh_fp)
     current_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}.tif'))
 
-    #  optionally, limiting to just tropical forest portions of AOH
+    #  optionally, limiting to just tropical forest portions of AOH and/or the area of applicability (AOA)
     if tropical_zone is not None:
         human_absent_aoh = human_absent_aoh.rio.clip(tropical_zone, all_touched = True).fillna(0) # making sure to set NAs back to 0
         current_aoh = current_aoh.rio.clip(tropical_zone, all_touched = True).fillna(0)
 
-    #  optionally, capping RRs at 1 (no change)
-    if no_increase:
-        current_hp = current_hp.clip(max = 1)
-        human_absent_hp = human_absent_hp.clip(max = 1)
+    skip_calcs = False
+    if aoa is not None:
+        try:
+            human_absent_aoh = human_absent_aoh.rio.clip(aoa, all_touched = True).fillna(0)
+            current_aoh = current_aoh.rio.clip(aoa, all_touched = True).fillna(0)
+        except rxr.exceptions.NoDataInBounds:
+            skip_calcs = True # case where there's fully no overlap - so we skip further computations
 
-    #  ensure hunting pressure maps align precisely w/respective AOHs
-    human_absent_hp = human_absent_hp.rio.reproject_match(human_absent_aoh)
-    current_hp = current_hp.rio.reproject_match(current_aoh)
+    if not skip_calcs:
+        # Optionally, capping RRs at 1 (no change)
+        if no_increase:
+            current_hp = current_hp.clip(max = 1)
+            human_absent_hp = human_absent_hp.clip(max = 1)
 
-    # Putting RR=1 (no hunting effect) in AOH areas with no predictions for hunting maps
-    no_pred_mask = ((human_absent_aoh != 0) & (xr.ufuncs.isnan(human_absent_hp)))
-    human_absent_hp = human_absent_hp.where(~no_pred_mask, other = 1)
+        # Ensure hunting pressure maps align precisely w/respective AOHs
+        human_absent_hp = human_absent_hp.rio.reproject_match(human_absent_aoh)
+        current_hp = current_hp.rio.reproject_match(current_aoh)
 
-    no_pred_mask = ((current_aoh != 0) & (xr.ufuncs.isnan(current_hp)))
-    current_hp = current_hp.where(~no_pred_mask, other = 1)
+        # Putting RR=1 (no hunting effect) in AOH areas with no predictions for hunting maps
+        no_pred_mask = ((human_absent_aoh != 0) & (xr.ufuncs.isnan(human_absent_hp)))
+        human_absent_hp = human_absent_hp.where(~no_pred_mask, other = 1)
 
-    # Getting different needed AOH quantities
-    #  first: human-absent + current AOHs
-    human_absent_aoh_total = float(human_absent_aoh.sum())
-    current_aoh_total = float(current_aoh.sum())
+        no_pred_mask = ((current_aoh != 0) & (xr.ufuncs.isnan(current_hp)))
+        current_hp = current_hp.where(~no_pred_mask, other = 1)
 
-    #  next: element-wise multiplications w/predicted hunting pressure maps to get
-    #   scenarios with hunting
-    human_absent_aoh_w_hunting = human_absent_aoh * human_absent_hp
-    human_absent_aoh_w_hunting_total = float(human_absent_aoh_w_hunting.sum())
+        # Getting different needed AOH quantities
+        #  first: human-absent + current AOHs
+        human_absent_aoh_total = float(human_absent_aoh.sum())
+        current_aoh_total = float(current_aoh.sum())
 
-    current_aoh_w_hunting = current_aoh * current_hp
-    current_aoh_w_hunting_total = float(current_aoh_w_hunting.sum())
+        #  next: element-wise multiplications w/predicted hunting pressure maps to get
+        #   scenarios with hunting
+        human_absent_aoh_w_hunting = human_absent_aoh * human_absent_hp
+        human_absent_aoh_w_hunting_total = float(human_absent_aoh_w_hunting.sum())
+
+        current_aoh_w_hunting = current_aoh * current_hp
+        current_aoh_w_hunting_total = float(current_aoh_w_hunting.sum())
+    else:
+        human_absent_aoh_total, current_aoh_total, human_absent_aoh_w_hunting_total, current_aoh_w_hunting_total = 0, 0, 0, 0
 
     # Packaging everything in a dictionary (a single row for a dataframe)
     return_dict = {'species' : species,
@@ -88,12 +99,14 @@ def main(params, mode):
     no_increase = params['no_increase']
     hybrid_hab_map = bool(params['hybrid_hab_map'])
     just_tropical_forest = bool(params['just_tropical_forest'])
+    just_in_aoa = bool(params['just_in_aoa'])
 
     #  file paths
     filepaths = params['filepaths'][mode]
 
     tropical_mammals_fp = filepaths['tropical_mammals_fp']
     tropical_zone_fp = filepaths['tropical_zone_fp']
+    aoa_fp = filepaths['aoa_fp']
 
     hunting_preds_dir = filepaths['hunting_preds_dir']
     current_aoh_dir = filepaths['current_aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir'])
@@ -122,13 +135,23 @@ def main(params, mode):
             filtered_iucn_ids.append(sp)
 
     # Reading the tropical forest extent polygon for masking non-forest pixels
-    print(f'Computing differences {"across full" if not just_tropical_forest else "within tropical forest"} AOH\n')
+    print(f'Computing differences {"across full" if not just_tropical_forest else "within tropical forest"} AOH')
 
     if just_tropical_forest:
         tropical_zone = gpd.read_file(tropical_zone_fp)
         tropical_zone = [tropical_zone.geometry.iloc[0]]
     else:
         tropical_zone = None
+
+    # Reading the area of applicability (AOA) polygon for masking non-applicable pixels
+    if just_in_aoa:
+        print('  also limiting stats to area of applicability')
+        aoa = gpd.read_file(aoa_fp)
+        aoa = [aoa.geometry.iloc[0]]
+    else:
+        aoa = None
+
+    print()
 
     # Collecting AOH info for each species in parallel:
     #  1. Human-absent AOH,
@@ -142,11 +165,12 @@ def main(params, mode):
                                                                                                  model_to_use,
                                                                                                  no_increase,
                                                                                                  hybrid_hab_map, 
-                                                                                                 tropical_zone) for sp in filtered_iucn_ids)
+                                                                                                 tropical_zone,
+                                                                                                 aoa) for sp in filtered_iucn_ids)
 
     # Saving the data frame containing different bits of AOH info
     aoh_info_df = pd.DataFrame(aoh_dicts)
-    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_just-tropical-forest" if just_tropical_forest else ""}{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.csv'), index = False)
+    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_just-tropical-forest" if just_tropical_forest else ""}{"_just-aoa" if just_in_aoa else ""}{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.csv'), index = False)
 
 if __name__ == '__main__':
     # Read in parameters
