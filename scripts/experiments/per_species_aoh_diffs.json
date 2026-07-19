@@ -2,10 +2,11 @@
     "iucn_id_subset" : [],
     "model_to_use" : "rf-3part",
     "num_cores" : 8,
-    "no_increase" : 0,
+    "no_increase" : 1,
     "hybrid_hab_map" : 1,
     "just_tropical_forest" : 1,
-    "just_in_aoa" : 0,
+    "just_in_aoa" : 1,
+    "with_standardization" : 1,
     "filepaths" : {
         "local" : {
             "non_hybrid_dir" : "aohs_non_hybrid",

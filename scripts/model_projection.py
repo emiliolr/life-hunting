@@ -23,8 +23,11 @@ import rioxarray as rxr
 import xarray as xr
 import geopandas as gpd
 
+TEST = False
+
 def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical_zone, mammals_data, model,
-                            model_to_use, aoh_dir, save_raster, save_dir, error_fp, hybrid_hab_map):
+                            model_to_use, aoh_dir, save_raster, save_dir, error_fp, hybrid_hab_map, 
+                            apply_standardization):
     # Get the species' name + body mass
     species_row = tropical_mammals[tropical_mammals['iucn_id'] == species]
     species_bm = species_row['combine_body_mass'].iloc[0]
@@ -87,19 +90,23 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
     # Putting data in a Pandas DataFrame so the predict function of the hurdle model can grab the right vars
     predictors_tabular_no_nan = pd.DataFrame(predictors_tabular_no_nan, columns = list(predictor_stack_clipped.keys()))
 
-    #  adding the same (standardized) body mass value to each row
-    if model_to_use == 'pymer':
-        bm = np.log10(mammals_data['Body_Mass'])
-        bm_mean, bm_std = bm.mean(), bm.std()
-        
-        species_bm_std = (np.log10(species_bm) - bm_mean) / bm_std
-    else:
-        bm = mammals_data['Body_Mass']
-        bm_mean, bm_std = bm.mean(), bm.std()
-        
-        species_bm_std = (species_bm - bm_mean) / bm_std
+    #  adding the same (potentially standardized) body mass value to each row
+    if apply_standardization:
+        if 'pymer' in model_to_use:
+            bm = np.log10(mammals_data['Body_Mass'])
+            bm_mean, bm_std = bm.mean(), bm.std()
+            
+            species_bm = (np.log10(species_bm) - bm_mean) / bm_std
+        else:
+            bm = mammals_data['Body_Mass']
+            bm_mean, bm_std = bm.mean(), bm.std()
 
-    predictors_tabular_no_nan['Body_Mass'] = species_bm_std
+            if TEST:
+                bm_mean, bm_std = np.mean(bm).astype(np.float64), np.std(bm).astype(np.float64)
+            
+            species_bm = (species_bm - bm_mean) / bm_std
+
+    predictors_tabular_no_nan['Body_Mass'] = species_bm
 
     #  apply the trained hurdle model to each pixel iteratively
     pred = model.predict(predictors_tabular_no_nan)
@@ -126,12 +133,16 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
 def main(params, mode):
     # Parsing parameters passed in via JSON
     model_to_use = params['model_to_use'] 
+    trait_null = bool(params['trait_null'])
+    reset_prob_thresh = bool(params['reset_prob_thresh'])
     save_raster = bool(params['save_raster'])
 
     num_cores = params['num_cores']
 
     current_aoh = params['current_aoh']
     hybrid_hab_map = bool(params['hybrid_hab_map'])
+
+    apply_standardization = bool(params['apply_standardization'])
     
     #  a subset of iucn IDs, for testing (if empty, will loop over all IDs)
     iucn_ids = params['iucn_id_subset']
@@ -153,6 +164,13 @@ def main(params, mode):
 
     error_fp = filepaths['error_fp']
 
+    #  checking input combos
+    assert (not trait_null) or (model_to_use == 'rf-3part'), 'Only the RF 3-part model is supported for the trait-based ablation'
+    if trait_null:
+        model_to_use += '_trait-null'
+    if not apply_standardization:
+        model_to_use += '_no-standardization'
+
     #  either applying to current AOHs or human-absent
     if current_aoh:
         aoh_dir = filepaths['current_aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir'])
@@ -160,14 +178,6 @@ def main(params, mode):
     else:
         aoh_dir = filepaths['human_absent_aoh_dir'] % (filepaths['hybrid_dir'] if hybrid_hab_map else filepaths['non_hybrid_dir'])
         save_dir = os.path.join(filepaths['save_dir'], 'human_absent') + ('_hybrid' if hybrid_hab_map else '')
-        
-    # Reading in the predictor raster stack
-    print('Reading predictor stack')
-
-    predictor_stack = rxr.open_rasterio(predictor_stack_fp, band_as_variable = True)
-
-    #  correcting the variable names
-    predictor_stack = predictor_stack.rename({band : predictor_stack[band].attrs['long_name'] for band in predictor_stack})
 
     # Reading the tropical forest extent polygon for masking non-forest pixels
     tropical_zone = gpd.read_file(tropical_zone_fp)
@@ -175,6 +185,14 @@ def main(params, mode):
 
     # Reading the full mammal_recreated dataset for z-score stats
     mammals_data = pd.read_csv(mammals_data_fp)
+
+    # Reading in the predictor raster stack
+    print('Reading predictor stack')
+
+    predictor_stack = rxr.open_rasterio(predictor_stack_fp, band_as_variable = True)
+
+    #  correcting the variable names
+    predictor_stack = predictor_stack.rename({band : predictor_stack[band].attrs['long_name'] for band in predictor_stack})
 
     #  columns to use
     cols_to_normalize = list(predictor_stack.keys())
@@ -194,26 +212,34 @@ def main(params, mode):
     col_means = mammals_cols_to_normalize.mean(axis = 0)
     col_stds = mammals_cols_to_normalize.std(axis = 0)
 
-    # Applying data preprocessing to predictor rasters
-    print('Normalizing predictors')
+    if TEST:
+        print('  testing floating point precision issue')
+        col_means_new = np.mean(mammals_cols_to_normalize.values, axis = 0).astype(np.float64)
+        col_means = pd.Series(col_means_new, index = col_means.index)
 
-    for pred in cols_to_normalize:
-        temp = predictor_stack[pred]
-        
-        if pred == 'Dist_Settlement_KM':
-            temp = temp / 1000 # converting to actual km
+        col_stds_new = np.std(mammals_cols_to_normalize.values, axis = 0).astype(np.float64)
+        col_stds = pd.Series(col_stds_new, index = col_stds.index)
 
-        #  log10-transforming continuous vars (just linear hurdle)
-        if model_to_use == 'pymer':
-            temp = temp.where(temp != 0, other = 0.1) # making sure there aren't issues w/taking the log
-            temp = xr.ufuncs.log10(temp)
-        
-        #  z-score normalization
-        temp = temp - col_means[pred]
-        temp = temp / col_stds[pred]
+    # Optionally, applying data preprocessing to predictor rasters
+    predictor_stack['Dist_Settlement_KM'] = predictor_stack['Dist_Settlement_KM'] / 1000 # converting to actual km
 
-        #  slotting the preprocessed version back into the dataset
-        predictor_stack[pred] = temp
+    if apply_standardization:
+        print('Normalizing predictors')
+
+        for pred in cols_to_normalize:
+            temp = predictor_stack[pred]
+
+            #  log10-transforming continuous vars (just linear hurdle)
+            if model_to_use == 'pymer':
+                temp = temp.where(temp != 0, other = 0.1) # making sure there aren't issues w/taking the log
+                temp = xr.ufuncs.log10(temp)
+            
+            #  z-score normalization
+            temp = temp - col_means[pred]
+            temp = temp / col_stds[pred]
+
+            #  slotting the preprocessed version back into the dataset
+            predictor_stack[pred] = temp
 
     # Reading in the saved predictive model
     print('Reading saved model')
@@ -224,21 +250,31 @@ def main(params, mode):
                  'xgboost' : 'xgboost_hurdle_10.0mins.pkl',
                  'pymer' : 'pymer_hurdle.pkl', 
                  'xgboost-3part' : 'xgboost_three_part_10.0mins.pkl',
-                 'rf-3part' : 'rf_three_part_10.0mins.pkl'}
+                 'rf-3part' : 'rf_three_part_10.0mins.pkl',
+                 'rf-3part_no-standardization' : 'rf_three_part_no-standardization_10.0mins.pkl',
+                 'rf-3part_trait-null_no-standardization' : 'rf_three_part_trait-null_no-standardization_2.0mins.pkl'}
     model_fp = os.path.join(model_dir, model_fps[model_to_use])
     
     with open(model_fp, 'rb') as f:
         model = pickle.load(f)
 
+    #  optionally, removing the tuned probability threshold for the local extirp classifier
+    if reset_prob_thresh & ('3part' not in model_to_use):
+        model.prob_thresh = 0.5
+        model_to_use += '_reset-thresh'
+
     # Reading in the tropical mammal body mass data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
 
     #  grabbing the subset of IDs to run over
+    use_all_species = False
     if isinstance(iucn_ids, list):
         if len(iucn_ids) == 0:
             iucn_ids = tropical_mammals['iucn_id'].to_list()
+            use_all_species = True
     elif isinstance(iucn_ids, int):
         iucn_ids = tropical_mammals['iucn_id'].iloc[ : iucn_ids].to_list()
+    print(f'Running over {len(iucn_ids)} species')
 
     # Looping over the tropical mammal species and applying the predictive model IN PARALLEL
     print('Making hunting predictions\n')
@@ -253,12 +289,19 @@ def main(params, mode):
                                                                                                   save_raster,
                                                                                                   save_dir, 
                                                                                                   error_fp,
-                                                                                                  hybrid_hab_map) for species in iucn_ids)
+                                                                                                  hybrid_hab_map, 
+                                                                                                  apply_standardization) for species in iucn_ids)
     
     # Adding the percent overlap stats to the tropical mammal dataset + saving
     aoh_pct_overlap = pd.DataFrame(aoh_pct_overlap, columns = ['iucn_id', 'aoh_pct_overlap'])
     aoh_pct_overlap = tropical_mammals[['iucn_id']].merge(aoh_pct_overlap, on = 'iucn_id', how = 'left')
-    aoh_pct_overlap.to_csv(os.path.join(save_dir, 'tropical_mammals_aoh_overlap.csv'), index = False)
+
+    save_fp = os.path.join(save_dir, 'tropical_mammals_aoh_overlap.csv')
+    if os.path.isfile(save_fp):
+        if use_all_species:
+            aoh_pct_overlap.to_csv(save_fp, index = False) # overwrite only if we're running over all species
+    else:
+        aoh_pct_overlap.to_csv(save_fp, index = False) # if it doesn't exist yet, feel free to write to file
 
 if __name__ == '__main__':
     # Read in parameters

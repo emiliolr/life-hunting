@@ -124,7 +124,8 @@ def setup_and_train_model(args, data):
                    'dataset' : args.dataset,
                    'embeddings_to_use' : None,
                    'embeddings_args' : None,
-                   'pca_cols' : pca_cols}
+                   'pca_cols' : pca_cols,
+                   'standardize' : True}
 
         #  results saving params
         if args.flaml_single_model is None:
@@ -176,7 +177,8 @@ def setup_and_train_model(args, data):
                    'include_categorical' : True,
                    'polynomial_features' : 0,
                    'log_trans_cont' : True,
-                   'dataset' : args.dataset}
+                   'dataset' : args.dataset,
+                   'standardize' : True}
 
         #  results saving params
         args.model_name = 'pymer_hurdle'
@@ -195,9 +197,12 @@ def setup_and_train_model(args, data):
         args.tune_hurdle_thresh = False
         
         if args.dataset == 'mammals_recreated':
-            pred_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
-                         'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
-                         'Percent_Settlement_50km', 'Protected_Area', 'PC']
+            if args.trait_null:
+                pred_cols = ['Body_Mass']
+            else:
+                pred_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
+                            'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
+                            'Percent_Settlement_50km', 'Protected_Area', 'PC']
             pca_cols = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 
                         'Rule_of_Law', 'Accountability']
         else:
@@ -284,22 +289,25 @@ def setup_and_train_model(args, data):
                    'polynomial_features' : 0,
                    'log_trans_cont' : False,
                    'dataset' : args.dataset,
-                   'pca_cols' : pca_cols}
+                   'pca_cols' : pca_cols,
+                   'standardize' : True}
 
         #  results saving params
         if args.flaml_single_model is None:
             args.model_name = f'FLAML_three_part_{args.time_budget_mins}mins'
         else:
-            args.model_name = f'{args.flaml_single_model[0]}_three_part_{args.time_budget_mins}mins'
+            args.model_name = f'{args.flaml_single_model[0]}_three_part{"_trait-null" if args.trait_null else ""}_{args.time_budget_mins}mins'
 
     # Preprocess the data
-    pp_data = preprocess_data(data, standardize = True, pca_save_fp = '/Users/emiliolr/Desktop/gov_pca.pickle', **pp_args)
+    pp_data = preprocess_data(data, pca_save_fp = '/Users/emiliolr/Desktop/gov_pca.pickle', **pp_args)
 
     # Train the hurdle model
     if args.verbose:
         print(f'Training the {args.model_to_use}{" hurdle" if "three_part" not in args.model_to_use else ""} model on {args.dataset}')
         if args.flaml_single_model is not None:
-            print(f'  (single FLAML model - {args.flaml_single_model[0]})')
+            print(f'  single FLAML model - {args.flaml_single_model[0]}')
+        if args.trait_null:
+            print('  training trait-based null (only predictor is body mass)')
     train_model(args, model, pp_data, fit_args)
 
     return model
@@ -364,6 +372,7 @@ if __name__ == '__main__':
 
     # MODEL PARAMS
     parser.add_argument('--model_to_use', type = str, default = 'FLAML', choices = ['pymer', 'FLAML', 'FLAML_three_part'])
+    parser.add_argument('--trait_null', type = int, default = 0)
 
     # RESULTS SAVE PARAMS
     parser.add_argument('--save_fp', type = str, default = '../final_models')
@@ -387,6 +396,7 @@ if __name__ == '__main__':
     args.gdrive = bool(args.gdrive)
     args.rebalance_dataset = bool(args.rebalance_dataset)
     args.tune_thresh = bool(args.tune_thresh)
+    args.trait_null = bool(args.trait_null)
 
     #  a few arguments to set this apart from the feature selection script
     args.verbose = True

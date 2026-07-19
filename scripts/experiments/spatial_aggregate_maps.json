@@ -1,11 +1,14 @@
 {
     "iucn_id_subset" : [],
     "map_type" : "hunting_pressure",
-    "model_to_use" : "rf-3part",
+    "model_to_use" : "pymer",
     "current" : 1,
-    "no_increase" : 1,
-    "facet_body_mass" : 1,
+    "no_increase" : 0,
+    "facet_body_mass" : 0,
     "hybrid_hab_map" : 1,
+    "apply_standardization" : 1,
+    "reset_prob_thresh" : 1,
+    "trait_null" : 0,
     "filepaths" : {
         "local" : {
             "non_hybrid_dir" : "aohs_non_hybrid",

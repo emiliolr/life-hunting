@@ -19,7 +19,7 @@ import xarray as xr
 import geopandas as gpd
 
 def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir, hunting_preds_dir, model_to_use, 
-                                 no_increase, hybrid_hab_map, tropical_zone, aoa):
+                                 no_increase, hybrid_hab_map, tropical_zone, aoa, with_standardization):
     # Reading in the four needed rasters: (1) human-absent AOH, (2) current AOH, (3 + 4) hunting pressure maps
     if hybrid_hab_map:
         human_absent_aoh_poss_fps = glob.glob(os.path.join(human_absent_aoh_dir, f'aoh_T{species}A*_RESIDENT.tif'))
@@ -27,7 +27,7 @@ def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir,
     else:
         human_absent_aoh_fp = os.path.join(human_absent_aoh_dir, f'{species}_RESIDENT.tif')
     human_absent_aoh = rxr.open_rasterio(human_absent_aoh_fp)
-    human_absent_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}.tif'))
+    human_absent_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}{"_no-standardization" if not with_standardization else ""}.tif'))
 
     if hybrid_hab_map:
         current_aoh_poss_fps = glob.glob(os.path.join(current_aoh_dir, f'aoh_T{species}A*_RESIDENT.tif'))
@@ -35,7 +35,7 @@ def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir,
     else:
         current_aoh_fp = os.path.join(current_aoh_dir, f'{species}_RESIDENT.tif')
     current_aoh = rxr.open_rasterio(current_aoh_fp)
-    current_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}.tif'))
+    current_hp = rxr.open_rasterio(os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{species}_hunting_pred_{model_to_use}{"_no-standardization" if not with_standardization else ""}.tif'))
 
     #  optionally, limiting to just tropical forest portions of AOH and/or the area of applicability (AOA)
     if tropical_zone is not None:
@@ -93,11 +93,16 @@ def collect_aoh_info_one_species(species, current_aoh_dir, human_absent_aoh_dir,
 
 def main(params, mode):
     # Parsing parameters passed in via JSON
-    model_to_use = params['model_to_use']
     iucn_ids = params['iucn_id_subset']
-    num_cores = params['num_cores']
+
+    model_to_use = params['model_to_use']
     no_increase = params['no_increase']
+    with_standardization = bool(params['with_standardization'])
+
+    num_cores = params['num_cores']
+
     hybrid_hab_map = bool(params['hybrid_hab_map'])
+
     just_tropical_forest = bool(params['just_tropical_forest'])
     just_in_aoa = bool(params['just_in_aoa'])
 
@@ -134,6 +139,8 @@ def main(params, mode):
         if (pct_overlap_current > 0) and (pct_overlap_human_absent > 0):
             filtered_iucn_ids.append(sp)
 
+    print(f'Running over {len(filtered_iucn_ids)} species')
+
     # Reading the tropical forest extent polygon for masking non-forest pixels
     print(f'Computing differences {"across full" if not just_tropical_forest else "within tropical forest"} AOH')
 
@@ -166,11 +173,12 @@ def main(params, mode):
                                                                                                  no_increase,
                                                                                                  hybrid_hab_map, 
                                                                                                  tropical_zone,
-                                                                                                 aoa) for sp in filtered_iucn_ids)
+                                                                                                 aoa, 
+                                                                                                 with_standardization) for sp in filtered_iucn_ids)
 
     # Saving the data frame containing different bits of AOH info
     aoh_info_df = pd.DataFrame(aoh_dicts)
-    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_just-tropical-forest" if just_tropical_forest else ""}{"_just-aoa" if just_in_aoa else ""}{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.csv'), index = False)
+    aoh_info_df.to_csv(os.path.join(hunting_preds_dir, f'effective_aoh_info_{model_to_use}{"_just-tropical-forest" if just_tropical_forest else ""}{"_just-aoa" if just_in_aoa else ""}{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}{"_no-standardization" if not with_standardization else ""}.csv'), index = False)
 
 if __name__ == '__main__':
     # Read in parameters

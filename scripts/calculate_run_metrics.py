@@ -54,13 +54,13 @@ def get_run_info_from_fname(filename):
             else:
                 model_name = bits[0 : 4]
                 i = 4
-
-        if bits[i] not in ['mammals', 'birds']:
-            model_name = bits[0 : i + 1]
-            i += 1
     elif model == 'dummy':
         model_name = bits[0 : 3]
         i = 3
+
+    if bits[i] not in ['mammals', 'birds']:
+        model_name = bits[0 : i + 1]
+        i += 1
     model_name = '_'.join(model_name)
 
     #  ignoring direct regression & classification models

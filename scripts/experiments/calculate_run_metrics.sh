@@ -1,0 +1,1 @@
+python calculate_run_metrics.py --pred_dir ../testing_governance/raw_predictions --save_results 1 --save_dir ../testing_governance --extirp_pos 0

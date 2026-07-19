@@ -52,18 +52,25 @@ def aoh_extinction_curve(aoh_hum_abs, aoh_new, curve_type = 'power_law', z = 0.2
 def main(params, mode):
     # Parsing parameters passed in via JSON
     iucn_ids = params['iucn_id_subset']
+
     map_type = params['map_type']
-    model_to_use = params['model_to_use']
     current = bool(params['current'])
-    no_increase = bool(params['no_increase'])
     hybrid_hab_map = bool(params['hybrid_hab_map'])
+
+    model_to_use = params['model_to_use']
+    no_increase = bool(params['no_increase'])
+    apply_standardization = bool(params['apply_standardization'])
+    trait_null = bool(params['trait_null'])
+    reset_prob_thresh = bool(params['reset_prob_thresh'])
 
     facet_body_mass = bool(params['facet_body_mass'])
     if facet_body_mass:
         assert map_type in ['hunting_pressure', 'species_richness'], f'Faceting by body mass not supported for map type {map_type}.'
 
     valid_map_types = ['species_richness', 'hunting_pressure', 'joint_aoh_effect', 'partial_aoh_effects', 'restore_and_abate']
-    assert map_type in valid_map_types, f'{map_type} not currently supported.'
+    assert map_type in valid_map_types, f'{map_type} not currently supported'
+    assert (not trait_null) or ((model_to_use == 'rf-3part') and (not apply_standardization) and (map_type == 'hunting_pressure')), 'Can only perform trait ablation with the "rf-3part" model and for map type "hunting_pressure"'
+    assert (not reset_prob_thresh) or ((model_to_use == 'pymer') and (map_type == 'hunting_pressure')), 'Can only reset the probability threshold of the local extirp. model for the linear hurdle ("pymer") and only for map type "hunting_pressure"'
 
     #  file paths
     filepaths = params['filepaths'][mode]
@@ -88,18 +95,18 @@ def main(params, mode):
     if map_type == 'species_richness':
         save_fp = os.path.join(save_dir, f'tropical_species_richness_map_{"current" if current else "human_absent"}%s{"_hybrid" if hybrid_hab_map else ""}.tif')
     elif map_type == 'hunting_pressure':
-        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_hunting_pressure_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_hunting_pressure_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}{"_trait-null" if trait_null else ""}{"_no-standardization" if not apply_standardization else ""}{"_reset-thresh" if reset_prob_thresh else ""}.tif')
     elif map_type == 'joint_aoh_effect':
-        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_joint_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')
+        save_fp = os.path.join(save_dir, f'tropical_species_aggregate_joint_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}{"_no-standardization" if not apply_standardization else ""}.tif')
     elif map_type == 'partial_aoh_effects':
-        save_fps = {'hunting' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hunting_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
-                    'habitat_loss' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hab_loss_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')}
+        save_fps = {'hunting' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hunting_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}{"_no-standardization" if not apply_standardization else ""}.tif'),
+                    'habitat_loss' : os.path.join(save_dir, f'tropical_species_aggregate_partial_hab_loss_effect_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}{"_no-standardization" if not apply_standardization else ""}.tif')}
     elif map_type == 'restore_and_abate':
         save_fps = {'restore_and_abate' : os.path.join(save_dir, f'tropical_species_aggregate_restore_and_abate_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
                     'restore' : os.path.join(save_dir, f'tropical_species_aggregate_restore_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
                     'abate' : os.path.join(save_dir, f'tropical_species_aggregate_abate_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif'),
                     'restore_baseline' : os.path.join(save_dir, f'tropical_species_aggregate_restore_baseline_{model_to_use}%s{"_no-increase" if no_increase else ""}{"_hybrid" if hybrid_hab_map else ""}.tif')}
-
+        
     # Reading in the tropical mammal data
     tropical_mammals = pd.read_csv(tropical_mammals_fp)
 
@@ -162,7 +169,7 @@ def main(params, mode):
                 else:
                     sp_fp = os.path.join(cur_aoh_dir if current else hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
             elif map_type == 'hunting_pressure':
-                sp_fp = os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
+                sp_fp = os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}{"_trait-null" if trait_null else ""}{"_no-standardization" if not apply_standardization else ""}{"_reset-thresh" if reset_prob_thresh else ""}.tif')
 
             sp_raster = rxr.open_rasterio(sp_fp)
         elif map_type in ['joint_aoh_effect', 'partial_aoh_effects', 'restore_and_abate']:
@@ -176,8 +183,8 @@ def main(params, mode):
             else:
                 cur_aoh_fp = os.path.join(cur_aoh_dir, f'{sp}_RESIDENT.tif')
                 hum_abs_aoh_fp = os.path.join(hum_abs_aoh_dir, f'{sp}_RESIDENT.tif')
-            hp_cur_fp = os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
-            hp_abs_fp = os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}.tif')
+            hp_cur_fp = os.path.join(hunting_preds_dir, 'current' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}{"_no-standardization" if not apply_standardization else ""}.tif')
+            hp_abs_fp = os.path.join(hunting_preds_dir, 'human_absent' + ('_hybrid' if hybrid_hab_map else ''), f'{sp}_hunting_pred_{model_to_use}{"_no-standardization" if not apply_standardization else ""}.tif')
 
             cur_aoh = rxr.open_rasterio(cur_aoh_fp)
             hum_abs_aoh = rxr.open_rasterio(hum_abs_aoh_fp)

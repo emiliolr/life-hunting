@@ -150,8 +150,12 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
             formula_zero = 'local_extirpation ~ BM + DistKm + I(DistKm^2) + TravTime + PopDens + Stunting + Reserve + BM*DistKm + BM*TravTime + BM*Stunting + (1|Country) + (1|Species)'
             formula_nonzero = 'RR ~ BM + DistKm + I(DistKm^2) + TravTime + PopDens + I(PopDens^2) + Stunting + Reserve + BM*DistKm + BM*TravTime + BM*Stunting + (1|Country) + (1|Species)'
         elif args.dataset == 'mammals_recreated':
-            formula_zero = 'local_extirpation ~ Body_Mass + Dist_Settlement_KM + I(Dist_Settlement_KM^2) + Population_Density + Stunting_Pct + Protected_Area + (1|Country) + (1|Species) + (1|Study)'
-            formula_nonzero = 'RR ~ Body_Mass + Dist_Settlement_KM + I(Dist_Settlement_KM^2) + Population_Density + I(Population_Density^2) + Body_Mass*Dist_Settlement_KM + (1|Country) + (1|Species) + (1|Study)'
+            if args.experiment_append == 'trait-null':
+                formula_zero = 'local_extirpation ~ Body_Mass + (1|Country) + (1|Species) + (1|Study)'
+                formula_nonzero = 'RR ~ Body_Mass + (1|Country) + (1|Species) + (1|Study)'
+            else:
+                formula_zero = 'local_extirpation ~ Body_Mass + Dist_Settlement_KM + I(Dist_Settlement_KM^2) + Population_Density + Stunting_Pct + Protected_Area + (1|Country) + (1|Species) + (1|Study)'
+                formula_nonzero = 'RR ~ Body_Mass + Dist_Settlement_KM + I(Dist_Settlement_KM^2) + Population_Density + I(Population_Density^2) + Body_Mass*Dist_Settlement_KM + (1|Country) + (1|Species) + (1|Study)'
         else:
             raise ValueError('Dataset {args.dataset} not implemented for pymer hurdle model')
 
@@ -190,7 +194,8 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                    'include_categorical' : True,
                    'polynomial_features' : 0,
                    'log_trans_cont' : True,
-                   'dataset' : args.dataset}
+                   'dataset' : args.dataset,
+                   'standardize' : True}
 
         #  results saving params
         model_name = 'pymer_hurdle'
@@ -372,7 +377,8 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                    'dataset' : args.dataset,
                    'embeddings_to_use' : args.embeddings_to_use,
                    'embeddings_args' : args.embeddings_args,
-                   'pca_cols' : pca_cols}
+                   'pca_cols' : pca_cols,
+                   'standardize' : True}
 
         #  results saving params
         if args.flaml_single_model is None:
@@ -409,6 +415,8 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                              'IUCN_Is_Hunted', 'IUCN_Is_Human_Food', 'IUCN_For_Handicrafts', 
                              'IUCN_For_Medicine', 'IUCN_For_Pet_Trade', 'IUCN_Is_Sport_Hunted', 
                              'IUCN_For_Wearing_Apparel', 'IUCN_Is_Threatened', 'Travel_Time_Small']
+            elif args.experiment_append == 'trait-null':
+                pred_cols = ['Body_Mass']
             else:
                 pred_cols = ['Body_Mass', 'Stunting_Pct', 'Literacy_Rate', 'Dist_Settlement_KM', 
                             'Travel_Time_Large', 'Livestock_Biomass', 'Population_Density', 
@@ -507,7 +515,8 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                    'polynomial_features' : 0,
                    'log_trans_cont' : False,
                    'dataset' : args.dataset,
-                   'pca_cols' : pca_cols}
+                   'pca_cols' : pca_cols, 
+                   'standardize' : True if (args.experiment_append != 'trait-null') else False}
 
         #  results saving params
         if args.flaml_single_model is None:
@@ -603,7 +612,8 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
                    'include_categorical' : False,
                    'polynomial_features' : 0,
                    'log_trans_cont' : False,
-                   'dataset' : args.dataset}
+                   'dataset' : args.dataset,
+                   'standardize' : True}
 
         #  results saving params
         model_name = f'dummy_regressor_{args.dummy_strat}'

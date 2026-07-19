@@ -160,7 +160,7 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
             train_idx, test_idx = split
             train_test_idxs = {'train' : train_idx, 'test' : test_idx}
 
-        pp_data = preprocess_data(data, standardize = True, train_test_idxs = train_test_idxs, **pp_args)
+        pp_data = preprocess_data(data, train_test_idxs = train_test_idxs, **pp_args)
 
         # Fitting/predicting differently for direct classification/regression vs. hurdle models
         if verbose:
