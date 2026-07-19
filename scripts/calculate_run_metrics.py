@@ -103,7 +103,7 @@ def get_run_info_from_fname(filename):
 
     return return_dict
 
-def get_metric_CV(raw_preds, metric, submodel = None, **kwargs):
+def get_metric_CV(raw_preds, metric, model_name, submodel = None, **kwargs):
 
     """
     Utility function to apply a given metric to each fold and then get the average and 
@@ -121,7 +121,15 @@ def get_metric_CV(raw_preds, metric, submodel = None, **kwargs):
         metric_by_group = raw_preds.apply(lambda x: metric(x['actual_zero'], x['predicted_zero'], **kwargs), 
                                           include_groups = False)
     elif submodel == 'nonzero':
-        metric_by_group = raw_preds.apply(lambda x: metric(x['actual'], x['predicted_nonzero'], **kwargs), 
+        col_name = 'predicted_nonzero' if ('hurdle' in model_name) else 'predicted'
+        metric_by_group = raw_preds.apply(lambda x: metric(x['actual'], x[col_name], **kwargs), 
+                                          include_groups = False)
+    elif submodel == 'increase':
+        metric_by_group = raw_preds.apply(lambda x: metric(x['actual'], x['predicted_increase'], **kwargs), 
+                                          include_groups = False)
+    elif submodel == 'decrease':
+        col_name = 'predicted_decrease' if ('three_part' in model_name) else 'predicted'
+        metric_by_group = raw_preds.apply(lambda x: metric(x['actual'], x[col_name], **kwargs), 
                                           include_groups = False)
     
     metric_mean = metric_by_group.mean()
@@ -206,7 +214,7 @@ def metrics_to_use():
     ba_local_extirp = {'function' : balanced_accuracy_score,
                        'kwargs' : {},
                        'name' : 'balanced_accuracy_local_extirpation',
-                       'valid' : 'hurdle', 
+                       'valid' : ['hurdle'], 
                        'submodel' : 'zero'}
     metrics.append(ba_local_extirp)
 
@@ -215,9 +223,34 @@ def metrics_to_use():
                    'kwargs' : {'lower_bound' : 0, 'upper_bound' : 2},
                    'name' : 'wasserstein_distance_continuous-%s',
                    'kwarg_name_fill' : 'upper_bound',
-                   'valid' : 'hurdle', 
+                   'valid' : ['hurdle'], 
                    'submodel' : 'nonzero'}
     metrics.append(wd_cont_eta)
+
+    #  median absolute error for just the continuous RR model
+    med_ae_inf_cont = {'function' : median_absolute_error, 
+                       'kwargs' : {},
+                       'name' : 'median_absolute_error_continuous-inf', 
+                       'valid' : ['hurdle', 'dummy'],
+                       'submodel' : 'nonzero'}
+    metrics.append(med_ae_inf_cont)
+
+    # THREE-PART COMPONENTS:
+    #  median absolute error for the decrease regressor
+    med_ae_dec = {'function' : median_absolute_error_range, 
+                  'kwargs' : {'lower_bound' : 0.001, 'upper_bound' : 0.999, 'return_pct_kept' : False},
+                  'name' : 'median_absolute_error_decrease',
+                  'valid' : ['three_part', 'dummy'], 
+                  'submodel' : 'decrease'}
+    metrics.append(med_ae_dec)
+
+    #  median absolute error for the increase regressor
+    med_ae_inc = {'function' : median_absolute_error_range, 
+                  'kwargs' : {'lower_bound' : 1.001, 'upper_bound' : np.inf, 'return_pct_kept' : False},
+                  'name' : 'median_absolute_error_increase',
+                  'valid' : ['three_part'],
+                  'submodel' : 'increase'}
+    metrics.append(med_ae_inc)
 
     return metrics
 
@@ -247,19 +280,37 @@ def main(args):
     # Getting the list of metrics to use
     metrics = metrics_to_use()
 
-    # Applying the metrics to the raw predictions, only applying hurdle-specific metrics to hurdle models
+    # Applying the metrics to the raw predictions, only applying hurdle of three-part metrics to those models
     for r in runs_to_eval:
         for m in metrics:
             submodel = None
-            if m['valid'] == 'hurdle':
-                if ('hurdle' in r['model_name']) and ('predicted_zero' in r['raw_preds'].columns):
-                    submodel = m['submodel']
-                else:
+            valid = m['valid']
+            model_name = r['model_name']
+
+            if valid != 'all':
+                for v in valid:
+                    if v in model_name:
+                        if (v != 'hurdle') or ('predicted_zero' in r['raw_preds'].columns):
+                            submodel = m['submodel']
+                
+                if submodel is None:
                     continue
+
+            # if m['valid'] == 'hurdle':
+            #     if ('hurdle' in r['model_name']) and ('predicted_zero' in r['raw_preds'].columns):
+            #         submodel = m['submodel']
+            #     else:
+            #         continue
+            # elif m['valid'] == 'three_part':
+            #     if 'three_part' in r['model_name']:
+            #         submodel = m['submodel']
+            #     else:
+            #         continue
 
             metric_name = m['name'] if '%' not in m['name'] else (m['name'] % m['kwargs'][m['kwarg_name_fill']])
             
-            metric_mean, metric_std = get_metric_CV(r['raw_preds'], m['function'], submodel = submodel, **m['kwargs'])
+            metric_mean, metric_std = get_metric_CV(r['raw_preds'], m['function'], submodel = submodel, 
+                                                    model_name = model_name, **m['kwargs'])
             r['new_metrics'][metric_name] = {'mean' : metric_mean, 'standard_deviation' : metric_std}
 
     # Turning new metric results into a dataframe

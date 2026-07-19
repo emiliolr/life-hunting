@@ -3,6 +3,7 @@ import warnings
 import numpy as np
 
 from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.dummy import DummyRegressor
 from sklearn.model_selection import KFold
 from sklearn.metrics import recall_score, balanced_accuracy_score
 
@@ -193,6 +194,25 @@ class SingleValueRegressor(RegressorMixin, BaseEstimator):
 
     def predict(self, X, **kwargs):
         return np.repeat(self.single_val, X.shape[0])
+    
+class DummyRegressorConditional(RegressorMixin, BaseEstimator):
+    def __init__(self, mode, strategy):
+        assert mode in ['decrease', 'nonzero'], 'The only supported modes are "decrease" and "nonzero"'
+       
+        self.mode = mode
+        self.model = DummyRegressor(strategy = strategy)
+
+    def fit(self, X, y):
+        if self.mode == 'decrease':
+            condition = ((y > 0) & (y < 1))
+        elif self.mode == 'nonzero':
+            condition = (y != 0)
+        
+        X, y = X[condition], y[condition]
+        self.model.fit(X, y)
+        
+    def predict(self, X):
+        return self.model.predict(X)
 
 def k_fold_cross_val(model, data, num_folds = 5, class_metrics = None, reg_metrics = None,
                      verbose = True, dataset = 'mammals'):

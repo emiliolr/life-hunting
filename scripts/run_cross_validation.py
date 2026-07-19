@@ -20,7 +20,7 @@ from pymer4 import Lmer
 from flaml import AutoML
 
 from utils import read_csv_non_utf
-from model_utils import HurdleModelEstimator, PymerModelWrapper, ThreePartModel, SingleValueRegressor
+from model_utils import HurdleModelEstimator, PymerModelWrapper, ThreePartModel, SingleValueRegressor, DummyRegressorConditional
 from custom_metrics import balanced_accuracy_FLAML, median_absolute_error_FLAML, mean_absolute_error_range
 from cross_validation import run_cross_val, save_cv_results
 
@@ -599,7 +599,12 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
 
     # Dummy regressor
     elif args.model_to_use == 'dummy_regressor':
-        model = DummyRegressor(strategy = args.dummy_strat)
+        if args.experiment_append == 'decrease-only':
+            model = DummyRegressorConditional(mode = 'decrease', strategy = args.dummy_strat)
+        elif args.experiment_append == 'nonzero-only':
+            model = DummyRegressorConditional(mode = 'nonzero', strategy = args.dummy_strat)
+        else:
+            model = DummyRegressor(strategy = args.dummy_strat)
         
         #  cross-validation params
         back_transform = False
