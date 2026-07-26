@@ -46,14 +46,42 @@ def get_args(params):
     return args
 
 def resample_dataset(data, args):
-    # Resample the rows (indices)
-    np.random.seed(1693)
+    # Resample by study, aiming for approx the same amount of data each time
+    studies = data['Study'].unique()
+    tol = data['Study'].value_counts().max() + 5
 
     all_res_idxs = []
-    idxs = [i for i in range(data.shape[0])]
     for i in range(args.num_resamples):
-        res_idxs = np.random.choice(idxs, size = data.shape[0], replace = True)
-        all_res_idxs.append(res_idxs)
+        #  get a random resample of more studies than needed
+        np.random.seed(i)
+        studies_res = np.random.choice(studies, size = studies.shape[0] * 2, replace = True)
+        
+        #  starting with a good guess of how many of the(resampled) studies will be 
+        #   needed, progressively add or subtract a study until we're at roughly
+        #   the same amount of data as the full dataset
+        correct_amt_of_data = False
+        num_studies_from_res = studies.shape[0]
+        while not correct_amt_of_data:
+            studies_sub = studies_res[ : num_studies_from_res] # get the subset of resampled studies for this iter
+        
+            #  gather all the dataset indices for all studies study (with possible repeats!)
+            idxs = []
+            for s in studies_sub:
+                idx_s = data[data['Study'] == s].index.to_list()
+                idxs.extend(idx_s)
+        
+            #  check if we're inside the dataset size tolerances and if not, adjust accordingly
+            not_too_much = (len(idxs) <= data.shape[0] + tol)
+            not_too_little = (len(idxs) >= data.shape[0] - tol)
+
+            if not_too_much and not_too_little:
+                correct_amt_of_data = True # we can exit
+            elif not not_too_much and not_too_little:
+                num_studies_from_res -= 1
+            elif not_too_much and not not_too_little:
+                num_studies_from_res += 1
+
+        all_res_idxs.append(np.array(idxs))
 
     return all_res_idxs
 
@@ -72,7 +100,7 @@ def main(params):
     args = get_args(params)
 
     # Read the data
-    data = read_data(args)
+    data = read_data(args).reset_index(drop = True)
 
     #  get the resampled indices to subset the dataset
     resample_idxs = resample_dataset(data, args)
