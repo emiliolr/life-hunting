@@ -299,9 +299,9 @@ def setup_and_train_model(args, data):
             args.model_name = f'{args.flaml_single_model[0]}_three_part{"_trait-null" if args.trait_null else ""}_{args.time_budget_mins}mins'
 
     # Preprocess the data
-    pp_data = preprocess_data(data, pca_save_fp = '/Users/emiliolr/Desktop/gov_pca.pickle', **pp_args)
+    pp_data = preprocess_data(data, pca_save_fp = None, **pp_args)
 
-    # Train the hurdle model
+    # Train the model
     if args.verbose:
         print(f'Training the {args.model_to_use}{" hurdle" if "three_part" not in args.model_to_use else ""} model on {args.dataset}')
         if args.flaml_single_model is not None:

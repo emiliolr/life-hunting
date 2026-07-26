@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 from sklearn.base import clone
-from sklearn.model_selection import GroupKFold, KFold
+from sklearn.model_selection import GroupKFold, KFold, PredefinedSplit
 
 from verde import BlockKFold
 
@@ -18,7 +18,7 @@ from model_utils import HurdleModelEstimator, ThreePartModel
 def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = None, spatial_spacing = 5,
                   fit_args = None, pp_args = None, class_metrics = None, reg_metrics = None, verbose = True,
                   random_state = 1693, sklearn_submodels = False, back_transform = True, direct = None,
-                  tune_hurdle_thresh = False):
+                  tune_hurdle_thresh = False, predefined_folds = None):
 
     """
     A function to run k-fold cross-validation over a given dataset and with a given model. Multiple
@@ -104,6 +104,13 @@ def run_cross_val(model, data, block_type = None, num_folds = 5, group_col = Non
             print(f'Using spatial blocking with spacing {spatial_spacing} degrees')
         groups = None
         kfold = BlockKFold(spacing = spatial_spacing, n_splits = num_folds, shuffle = True, random_state = random_state)
+    elif block_type == 'predefined':
+        assert predefined_folds is not None, 'If using predefined k-fold splits, must supply the folds using "predefined folds."'
+
+        if verbose:
+            print(f'Using predefined blocking splits')
+        groups = None
+        kfold = PredefinedSplit(predefined_folds)
 
     # Data structures for saving results
     classes = {0 : 'low', 1 : 'medium', 2 : 'high'}

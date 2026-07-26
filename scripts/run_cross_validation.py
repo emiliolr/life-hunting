@@ -69,7 +69,10 @@ def read_data(args):
     elif args.dataset == 'mammals':
         data = read_csv_non_utf(ben_lop_path)
     elif args.dataset == 'mammals_recreated':
-        data = pd.read_csv(ben_lop_rec_path)
+        if args.block_type != 'predefined':
+            data = pd.read_csv(ben_lop_rec_path)
+        else:
+            data = pd.read_csv(args.predefined_splits_fp)
 
         #  recoding IUCN category to make it a numeric indicator
         data['IUCN_Is_Threatened'] = data['IUCN_Category'].apply(lambda x: 1 if x == 'threatened or near threatened' else 0)
@@ -648,11 +651,14 @@ def set_up_and_run_cross_val(args, data, class_metrics, reg_metrics):
         print(f'Metrics: {all_metric_names}\n')
 
     # Run the cross-validation using the inputted params
+    predef_folds = data['fold'].values if (args.block_type == 'predefined') else None
+
     metrics_dict = run_cross_val(model, data, block_type = args.block_type, num_folds = args.num_folds, 
                                  group_col = args.group_col, spatial_spacing = args.spatial_spacing, fit_args = fit_args, 
                                  pp_args = pp_args, class_metrics = class_metrics, reg_metrics = reg_metrics, 
                                  verbose = True, random_state = 1693, sklearn_submodels = sklearn_submodels, 
-                                 back_transform = back_transform, direct = direct, tune_hurdle_thresh = args.tune_thresh)
+                                 back_transform = back_transform, direct = direct, tune_hurdle_thresh = args.tune_thresh,
+                                 predefined_folds = predef_folds)
     
     return metrics_dict, model_name
     
@@ -706,9 +712,10 @@ if __name__ == '__main__':
 
     # CROSS-VALIDATION PARAMS
     parser.add_argument('--num_folds', type = int, default = 5)
-    parser.add_argument('--block_type', type = str, default = 'random', choices = ['random', 'group', 'spatial'])
+    parser.add_argument('--block_type', type = str, default = 'random', choices = ['random', 'group', 'spatial', 'predefined'])
     parser.add_argument('--group_col', type = str, default = 'species', choices = ['species'])
     parser.add_argument('--spatial_spacing', type = int, default = 5)
+    parser.add_argument('--predefined_splits_fp', type = str, default = '')
 
     # RESULTS SAVE PARAMS
     parser.add_argument('--save_fp', type = str, default = '../phd_results')

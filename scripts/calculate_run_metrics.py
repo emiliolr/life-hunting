@@ -194,10 +194,10 @@ def metrics_to_use():
 
     #  median absolute percentage error, excluding small values
     med_ape_tau = {'function' : median_absolute_percent_error_tau, 
-                'kwargs' : {'tau' : 0, 'epsilon' : 1e-2},
-                'kwarg_name_fill' : 'tau',
-                'name' : 'median_absolute_percentage_error-%s',
-                'valid' : 'all'}
+                   'kwargs' : {'tau' : 0, 'epsilon' : 1e-2},
+                    'kwarg_name_fill' : 'tau',
+                    'name' : 'median_absolute_percentage_error-%s',
+                    'valid' : 'all'}
     metrics.append(med_ape_tau)
     
     # DISTRIBUTIONAL:
@@ -214,7 +214,7 @@ def metrics_to_use():
     ba_local_extirp = {'function' : balanced_accuracy_score,
                        'kwargs' : {},
                        'name' : 'balanced_accuracy_local_extirpation',
-                       'valid' : ['hurdle'], 
+                       'valid' : ['hurdle', 'dummy'], 
                        'submodel' : 'zero'}
     metrics.append(ba_local_extirp)
 
@@ -267,8 +267,10 @@ def main(args):
         fp = os.path.join(args.pred_dir, r['filename'])
 
         df = pd.read_csv(fp, index_col = 'index')
-        if 'predicted_zero' in df.columns:
-            df['actual_zero'] = (df['actual'] == 0).astype(int) if args.extirp_pos else (df['actual'] != 0).astype(int) 
+        if ('predicted_zero' in df.columns) or ('dummy' in r['model_name']):
+            df['actual_zero'] = (df['actual'] == 0).astype(int) if args.extirp_pos else (df['actual'] != 0).astype(int)
+            if 'dummy' in r['model_name']:
+                df['predicted_zero'] = (df['predicted'] == 0).astype(int) if args.extirp_pos else (df['predicted'] != 0).astype(int)
 
         date = os.path.getmtime(fp)
         date = datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S')
@@ -295,17 +297,6 @@ def main(args):
                 
                 if submodel is None:
                     continue
-
-            # if m['valid'] == 'hurdle':
-            #     if ('hurdle' in r['model_name']) and ('predicted_zero' in r['raw_preds'].columns):
-            #         submodel = m['submodel']
-            #     else:
-            #         continue
-            # elif m['valid'] == 'three_part':
-            #     if 'three_part' in r['model_name']:
-            #         submodel = m['submodel']
-            #     else:
-            #         continue
 
             metric_name = m['name'] if '%' not in m['name'] else (m['name'] % m['kwargs'][m['kwarg_name_fill']])
             
