@@ -1,12 +1,12 @@
 {
-    "model_to_use" : "pymer",
+    "model_to_use" : "rf-3part",
     "save_raster" : 1,
-    "num_cores" : 8,
+    "num_cores" : 1,
     "current_aoh" : 1,
     "hybrid_hab_map" : 1,
     "trait_null" : 0,
     "apply_standardization" : 1,
-    "reset_prob_thresh" : 1,
+    "reset_prob_thresh" : 0,
     "iucn_id_subset" : [],
     "filepaths" : {
         "local" : {

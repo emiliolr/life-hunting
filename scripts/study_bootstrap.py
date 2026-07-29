@@ -4,22 +4,29 @@ import warnings
 import argparse
 import pickle
 import json
+import glob
 
 import numpy as np
 import pandas as pd
 
+import rioxarray as rxr
+import xarray as xr
+import geopandas as gpd
+
 from run_cross_validation import read_data
 from train_final_model import setup_and_train_model
+from model_projection import read_predictor_stack
 from per_species_aoh_diffs import collect_aoh_info_one_species
 
 class ArgsHolder:
     def __init__(self):
         pass
 
-def get_args(params):
+def get_args(params, mode):
     # Loading parameters into an ArgsHolder wrapper for compatibility with
     #  other scripts
     args = ArgsHolder()
+    filepaths = params['filepaths'][mode]
 
     #  params for bootstrapping
     args.num_resamples = params['num_resamples']
@@ -43,12 +50,26 @@ def get_args(params):
     args.save_fp = '../testing_governance/bootstrapping'
     args.verbose = False
 
+    #  params for model projection
+    args.hybrid_hab_map = params['hybrid_hab_map']
+
+    args.predictor_stack_fp = filepaths['predictor_stack_fp']
+    args.mammals_data_fp = filepaths['mammals_data_fp']
+    args.tropical_mammals_fp = filepaths['tropical_mammals_fp']
+    args.tropical_zone_fp = filepaths['tropical_zone_fp']
+    
+    args.cur_aoh_dir = filepaths['current_aoh_dir'] % (filepaths['hybrid_dir'] if args.hybrid_hab_map else filepaths['non_hybrid_dir'])
+    args.hum_abs_aoh_dir = filepaths['human_absent_aoh_dir'] % (filepaths['hybrid_dir'] if args.hybrid_hab_map else filepaths['non_hybrid_dir'])
+
+    # args.apply_standardization = True
+    args.iucn_ids = params['iucn_id_subset']
+
     return args
 
 def resample_dataset(data, args):
     # Resample by study, aiming for approx the same amount of data each time
     studies = data['Study'].unique()
-    tol = data['Study'].value_counts().max() + 5
+    tol = int(data['Study'].value_counts().max() / 2) + 1
 
     all_res_idxs = []
     for i in range(args.num_resamples):
@@ -95,18 +116,166 @@ def train_resampled_models(data, resample_idxs, args):
 
     return all_models
 
-def main(params):
+def apply_all_models_one_species(species, tropical_mammals, predictor_stack, tropical_zone, mammals_data, model_list,
+                                 aoh_dir, hybrid_hab_map):
+    # Get the species' name + body mass
+    species_row = tropical_mammals[tropical_mammals['iucn_id'] == species]
+    species_bm = species_row['combine_body_mass'].iloc[0]
+
+    # Reading in the relevant AOH
+    if hybrid_hab_map:
+        aoh_poss_fps = glob.glob(os.path.join(aoh_dir, f'aoh_T{species}A*_RESIDENT.tif'))
+        if len(aoh_poss_fps) != 1:
+            return species, -2
+        aoh_fp = aoh_poss_fps[0]
+    else:
+        aoh_fp = os.path.join(aoh_dir, f'{species}_RESIDENT.tif')
+
+    if not os.path.isfile(aoh_fp):
+      return -2
+
+    aoh = rxr.open_rasterio(aoh_fp)
+
+    # Clipping the predictor rasters to the bounds of the AOH
+    predictor_stack_clipped = predictor_stack.rio.clip_box(*aoh.rio.bounds())
+
+    #  making sure the predictor stack is perfectly aligned w/AOH
+    predictor_stack_clipped = predictor_stack_clipped.rio.reproject_match(aoh)
+
+    # Masking predictions outside of the AOH & tropical forest zone (the intersection of the two)
+    aoh_in_forest_zone = aoh.rio.clip(tropical_zone, all_touched = True).fillna(0) # making sure to set NAs back to 0
+
+    #  applying to the predictor stack
+    predictor_stack_clipped = predictor_stack_clipped.where(aoh_in_forest_zone != 0)
+
+    # Calculating the area overlap of AOH & tropical forest as a percent of total AOH
+    aoh_total = float(aoh.sum())
+    aoh_in_forest = float(aoh_in_forest_zone.sum())
+
+    #  handling the case where there's no AOH at all...
+    if aoh_total == 0:
+        return -2 
+
+    pct_overlap = aoh_in_forest / aoh_total
+
+    #  skip making predictions if there's no overlap w/tropical forest
+    if pct_overlap == 0:
+        return 0
+
+    # Extracting the data to numpy + reshaping to get it in a "tabular" format
+    predictor_stack_np = predictor_stack_clipped.to_array().variable.values.squeeze(axis = 3)
+
+    num_y, num_x = predictor_stack_np[0].shape
+    predictors_tabular = predictor_stack_np.reshape(predictor_stack_np.shape[0], num_y * num_x).transpose()
+
+    #  tossing nan rows, but keeping track of where they are for reshaping back to raster later
+    nan_mask = np.any(np.isnan(predictors_tabular), axis = 1)
+    predictors_tabular_no_nan = predictors_tabular[~nan_mask, : ]
+
+    #  error handling for no pixels to predict on - should only be an issue if the predictor 
+    #   rasters have gaps that preclude model prediction (or poor alignment)
+    if predictors_tabular_no_nan.shape[0] == 0:
+        return -1
+
+    # Putting data in a Pandas DataFrame so the predict function of the hurdle model can grab the right vars
+    predictors_tabular_no_nan = pd.DataFrame(predictors_tabular_no_nan, columns = list(predictor_stack_clipped.keys()))
+
+    #  adding the same standardized body mass value to each row
+    bm = mammals_data['Body_Mass']
+    bm_mean, bm_std = bm.mean(), bm.std()
+    species_bm = (species_bm - bm_mean) / bm_std
+
+    predictors_tabular_no_nan['Body_Mass'] = species_bm
+
+    #  apply the trained hurdle model to each pixel iteratively
+    #   TODO: probably more space-efficient if this isn't held in a last, maybe xarray stack?
+    pred_list = []
+    for model in model_list:
+        pred = model.predict(predictors_tabular_no_nan)
+
+        #  putting the dataset all back together in a predicted raster
+        pred_tabular = np.empty(shape = predictors_tabular.shape[0])
+        pred_tabular.fill(np.nan)
+        pred_tabular[~nan_mask] = pred # one prediction for each pixel, w/nans put back in the right place
+
+        #  reshaping back to raster format + converting back to xarray
+        pred_raster = pred_tabular.transpose().reshape(num_y, num_x)
+        pred_raster_xr = xr.zeros_like(aoh_in_forest_zone)
+        pred_raster_xr.values = np.expand_dims(pred_raster, axis = 0)
+
+        pred_list.append(pred_raster_xr)
+    
+    return pred_list
+
+def get_aoh_stats_one_species(args, species, tropical_mammals, predictor_stack, tropical_zone, mammals_data, 
+                              model_list):
+    # FOR EACH MODEL:
+    #  (1) Predict current + human-absent HP maps
+    cur_hp_maps = apply_all_models_one_species(species, tropical_mammals, predictor_stack, tropical_zone, 
+                                               mammals_data, model_list, args.cur_aoh_dir, args.hybrid_hab_map)
+    hum_abs_hp_maps = apply_all_models_one_species(species, tropical_mammals, predictor_stack, tropical_zone, 
+                                                   mammals_data, model_list, args.hum_abs_aoh_dir, args.hybrid_hab_map)
+    
+    #  skip species that were filtered out during model projection for various reasons
+    if isinstance(cur_hp_maps, int) or isinstance(hum_abs_hp_maps, int):
+        return {'species' : species}
+
+    #  (2) Calculate eAOH stats (human-absent (+ w/HP) and current (+ w/HP))
+    
+    # RETURN: K different rows w/eAOH values, one for each model
+
+    pass
+
+def calculate_resampled_aoh_stats(args, models, tropical_mammals, predictor_stack, mammals_data):
+    # Grabbing the subset of IDs to run over
+    if isinstance(args.iucn_ids, list):
+        if len(args.iucn_ids) == 0:
+            args.iucn_ids = tropical_mammals['iucn_id'].to_list()
+    elif isinstance(args.iucn_ids, int):
+        args.iucn_ids = tropical_mammals['iucn_id'].iloc[ : args.iucn_ids].to_list()
+    print(f'\nRunning over {len(args.iucn_ids)} species')
+
+    # Reading the tropical forest extent polygon for masking non-forest pixels
+    tropical_zone = gpd.read_file(args.tropical_zone_fp)
+    tropical_zone = [tropical_zone.geometry.iloc[0]]
+
+    # Get AOH stats for all species over the models trained on the resampled data
+    #  TODO: outer parallelization here (over species)!
+    all_aoh_stats = []
+    for species in args.iucn_ids:
+        aoh_stats = get_aoh_stats_one_species(args, species, tropical_mammals, predictor_stack, 
+                                              tropical_zone, mammals_data, models)
+        all_aoh_stats.append(aoh_stats)
+
+    #  turn the AOH stats data into a proper dataframe
+    resampled_aoh_stats = None
+
+    return resampled_aoh_stats
+
+def main(params, mode):
     # Get the arguments to pass into other scripts
-    args = get_args(params)
+    args = get_args(params, mode)
 
     # Read the data
+    print('Reading and resampling the data')
     data = read_data(args).reset_index(drop = True)
 
     #  get the resampled indices to subset the dataset
     resample_idxs = resample_dataset(data, args)
 
-    # Train the models on each resampled dataset
+    # Train a model for each resampled version of the dataset
+    print('Training bootstrapped models\n')
     models = train_resampled_models(data, resample_idxs, args)
+
+    # Read the predictor stack (need to also read training data to normalize vars)
+    mammals_data = pd.read_csv(args.mammals_data_fp)
+
+    print('Reading predictor stack')
+    predictor_stack = read_predictor_stack(args.predictor_stack_fp, args.model_to_use, mammals_data, 
+                                           args.apply_standardization)
+
+    # Reading in the tropical mammal body mass data
+    tropical_mammals = pd.read_csv(args.tropical_mammals_fp)
 
 if __name__ == '__main__':
     # Read in parameters
@@ -117,4 +286,4 @@ if __name__ == '__main__':
     mode = 'local'
     print(f'Running in {mode} mode\n')
 
-    main(params)
+    main(params, mode)

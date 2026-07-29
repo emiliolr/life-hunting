@@ -130,6 +130,62 @@ def apply_model_one_species(species, tropical_mammals, predictor_stack, tropical
     # Returning tuples of (IUCN ID, AOH percent overlap)
     return species, pct_overlap
 
+def read_predictor_stack(predictor_stack_fp, model_to_use, mammals_data, apply_standardization):
+    # Read the predictor stack
+    predictor_stack = rxr.open_rasterio(predictor_stack_fp, band_as_variable = True)
+
+    #  correcting the variable names
+    predictor_stack = predictor_stack.rename({band : predictor_stack[band].attrs['long_name'] for band in predictor_stack})
+
+    # Get the columns to use
+    cols_to_normalize = list(predictor_stack.keys())
+    cols_to_normalize = [c for c in cols_to_normalize if (c not in 'Protected_Area') and (not c.startswith('IUCN_Country_Region'))]
+    
+    gov_vars = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 'Rule_of_Law', 
+                'Accountability', 'PC_0', 'PC_1']
+    if model_to_use == 'pymer':
+        cols_to_normalize = [c for c in cols_to_normalize if c not in gov_vars]
+
+    #  extract columns means + standard deviations
+    mammals_cols_to_normalize = mammals_data[cols_to_normalize]
+    if model_to_use == 'pymer':
+        mammals_cols_to_normalize = mammals_cols_to_normalize.replace(0, 0.1)
+        mammals_cols_to_normalize = np.log10(mammals_cols_to_normalize)
+    
+    col_means = mammals_cols_to_normalize.mean(axis = 0)
+    col_stds = mammals_cols_to_normalize.std(axis = 0)
+
+    if TEST:
+        print('  testing floating point precision issue')
+        col_means_new = np.mean(mammals_cols_to_normalize.values, axis = 0).astype(np.float64)
+        col_means = pd.Series(col_means_new, index = col_means.index)
+
+        col_stds_new = np.std(mammals_cols_to_normalize.values, axis = 0).astype(np.float64)
+        col_stds = pd.Series(col_stds_new, index = col_stds.index)
+
+    # Optionally, applying data preprocessing to predictor rasters
+    predictor_stack['Dist_Settlement_KM'] = predictor_stack['Dist_Settlement_KM'] / 1000 # converting to actual km
+
+    if apply_standardization:
+        print('Normalizing predictors')
+
+        for pred in cols_to_normalize:
+            temp = predictor_stack[pred]
+
+            #  log10-transforming continuous vars (just linear hurdle)
+            if model_to_use == 'pymer':
+                temp = temp.where(temp != 0, other = 0.1) # making sure there aren't issues w/taking the log
+                temp = xr.ufuncs.log10(temp)
+            
+            #  z-score normalization
+            temp = temp - col_means[pred]
+            temp = temp / col_stds[pred]
+
+            #  slotting the preprocessed version back into the dataset
+            predictor_stack[pred] = temp
+
+    return predictor_stack
+
 def main(params, mode):
     # Parsing parameters passed in via JSON
     model_to_use = params['model_to_use'] 
@@ -188,58 +244,8 @@ def main(params, mode):
 
     # Reading in the predictor raster stack
     print('Reading predictor stack')
-
-    predictor_stack = rxr.open_rasterio(predictor_stack_fp, band_as_variable = True)
-
-    #  correcting the variable names
-    predictor_stack = predictor_stack.rename({band : predictor_stack[band].attrs['long_name'] for band in predictor_stack})
-
-    #  columns to use
-    cols_to_normalize = list(predictor_stack.keys())
-    cols_to_normalize = [c for c in cols_to_normalize if (c not in 'Protected_Area') and (not c.startswith('IUCN_Country_Region'))]
     
-    gov_vars = ['Corruption', 'Government_Effectiveness', 'Political_Stability', 'Regulation', 'Rule_of_Law', 
-                'Accountability', 'PC_0', 'PC_1']
-    if model_to_use == 'pymer':
-        cols_to_normalize = [c for c in cols_to_normalize if c not in gov_vars]
-
-    #  extract columns means + standard deviations
-    mammals_cols_to_normalize = mammals_data[cols_to_normalize]
-    if model_to_use == 'pymer':
-        mammals_cols_to_normalize = mammals_cols_to_normalize.replace(0, 0.1)
-        mammals_cols_to_normalize = np.log10(mammals_cols_to_normalize)
-    
-    col_means = mammals_cols_to_normalize.mean(axis = 0)
-    col_stds = mammals_cols_to_normalize.std(axis = 0)
-
-    if TEST:
-        print('  testing floating point precision issue')
-        col_means_new = np.mean(mammals_cols_to_normalize.values, axis = 0).astype(np.float64)
-        col_means = pd.Series(col_means_new, index = col_means.index)
-
-        col_stds_new = np.std(mammals_cols_to_normalize.values, axis = 0).astype(np.float64)
-        col_stds = pd.Series(col_stds_new, index = col_stds.index)
-
-    # Optionally, applying data preprocessing to predictor rasters
-    predictor_stack['Dist_Settlement_KM'] = predictor_stack['Dist_Settlement_KM'] / 1000 # converting to actual km
-
-    if apply_standardization:
-        print('Normalizing predictors')
-
-        for pred in cols_to_normalize:
-            temp = predictor_stack[pred]
-
-            #  log10-transforming continuous vars (just linear hurdle)
-            if model_to_use == 'pymer':
-                temp = temp.where(temp != 0, other = 0.1) # making sure there aren't issues w/taking the log
-                temp = xr.ufuncs.log10(temp)
-            
-            #  z-score normalization
-            temp = temp - col_means[pred]
-            temp = temp / col_stds[pred]
-
-            #  slotting the preprocessed version back into the dataset
-            predictor_stack[pred] = temp
+    predictor_stack = read_predictor_stack(predictor_stack_fp, model_to_use, mammals_data, apply_standardization)
 
     # Reading in the saved predictive model
     print('Reading saved model')

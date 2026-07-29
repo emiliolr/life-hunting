@@ -2,7 +2,7 @@
     "iucn_id_subset" : [],
     "model_to_use" : "rf-3part",
     "num_cores" : 1,
-    "num_resamples" : 10,
+    "num_resamples" : 5,
     "no_increase" : 1,
     "hybrid_hab_map" : 1,
     "just_tropical_forest" : 1,
@@ -13,8 +13,10 @@
             "current_aoh_dir" : "/Users/emiliolr/Desktop/mammal_aohs/%s/current",
             "human_absent_aoh_dir" : "/Users/emiliolr/Desktop/mammal_aohs/%s/pnv",
             "hunting_preds_dir" : "/Users/emiliolr/Desktop/hunting_revision_results/hunting_pressure_maps",
+            "mammals_data_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/benitez_lopez2019_recreated/benitez_lopez2019_recreated_extended_w_pca.csv",
             "tropical_mammals_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv",
-            "tropical_zone_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_forest_extent/tropical_forest_extent.shp"
+            "tropical_zone_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/tropical_forest_extent/tropical_forest_extent.shp",
+            "predictor_stack_fp" : "/Users/emiliolr/Google Drive/My Drive/LIFE/datasets/derived_datasets/hunting_predictor_stack/hunting_predictor_stack_governance_pca.tif"
         },
         "remote" : {
             "non_hybrid_dir" : "life25",
@@ -22,8 +24,10 @@
             "current_aoh_dir" : "/maps/mwd24/%s/aohs/current/MAMMALIA",
             "human_absent_aoh_dir" : "/maps/mwd24/%s/aohs/pnv/MAMMALIA",
             "hunting_preds_dir" : "/maps/el590/hunting_pressure_maps",
+            "mammals_data_fp" : "/maps/el590/benitez_lopez2019_recreated/benitez_lopez2019_recreated_extended_w_pca.csv",
             "tropical_mammals_fp" : "/maps/el590/tropical_species/tropical_mammals_taxonomic_info_w_body_mass_iucn2025.csv",
-            "tropical_zone_fp" : "/maps/el590/tropical_forest_extent/tropical_forest_extent.shp"
+            "tropical_zone_fp" : "/maps/el590/tropical_forest_extent/tropical_forest_extent.shp",
+            "predictor_stack_fp" : "/maps/el590/hunting_predictor_stack/hunting_predictor_stack_governance_pca.tif"
         }
     }
 }
