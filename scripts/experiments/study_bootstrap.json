@@ -1,8 +1,8 @@
 {
-    "iucn_id_subset" : [],
+    "iucn_id_subset" : 5,
     "model_to_use" : "rf-3part",
     "num_cores" : 1,
-    "num_resamples" : 5,
+    "num_resamples" : 2,
     "no_increase" : 1,
     "hybrid_hab_map" : 1,
     "just_tropical_forest" : 1,
