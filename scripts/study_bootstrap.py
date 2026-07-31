@@ -32,8 +32,10 @@ def get_args(params, mode):
     args.num_resamples = params['num_resamples']
     args.retrain_models = bool(params['retrain_models'])
     args.run_model_proj = bool(params['run_model_proj'])
-    args.model_save_dir = filepaths['model_save_dir']
+    args.continue_from_prev_run = bool(params['continue_from_prev_run'])
 
+    args.model_save_dir = filepaths['model_save_dir']
+    
     #  params for reading the dataset
     args.gdrive = True if (mode == 'local') else False
     args.dataset = 'mammals_recreated'
@@ -65,6 +67,8 @@ def get_args(params, mode):
     args.hum_abs_aoh_dir = filepaths['human_absent_aoh_dir'] % (filepaths['hybrid_dir'] if args.hybrid_hab_map else filepaths['non_hybrid_dir'])
 
     args.iucn_ids = params['iucn_id_subset']
+    assert (not args.continue_from_prev_run) or isinstance(args.iucn_ids, int), 'Can only add onto a previous run if supplying an integer number of IUCN IDs to process next'
+
     args.apply_standardization = False # we're going to do this model-by-model
 
     #  params for collecting AOH stats
@@ -73,6 +77,9 @@ def get_args(params, mode):
     args.num_cores = params['num_cores']
     
     args.hunting_preds_dir = filepaths['hunting_preds_dir']
+
+    #  params for saving results
+    args.results_save_fp = os.path.join(args.hunting_preds_dir, f'effective_aoh_info_RESAMPLE={args.num_resamples}_{params["model_to_use"]}{"_just-tropical-forest" if args.just_tropical_forest else ""}{"_no-increase" if args.no_increase else ""}{"_hybrid" if args.hybrid_hab_map else ""}.csv')
 
     return args
 
@@ -121,7 +128,11 @@ def train_resampled_models(data, resample_idxs, args):
     file_pattern = os.path.join(args.model_save_dir, f'rf-3part_{args.time_budget_mins}_*.pkl')
     model_fps = glob.glob(file_pattern)
 
-    #  case where we're retaining: loop through the data resamples + train a model for each
+    #  getting them into sorted order just for checking purposes
+    models_already_trained = [int(fp.split('_')[-1].removesuffix('.pkl')) for fp in model_fps]
+    model_fps = [model_fps[i] for i in np.argsort(models_already_trained)]
+
+    #  case where we're retraining: loop through the data resamples + train a model for each
     all_models = []
     if args.retrain_models:
         resample_idxs = resample_idxs[len(model_fps) : ] # only training models that we don't already have
@@ -316,8 +327,12 @@ def calculate_resampled_aoh_stats(args, models, tropical_mammals, predictor_stac
         if len(args.iucn_ids) == 0:
             args.iucn_ids = tropical_mammals['iucn_id'].to_list()
     elif isinstance(args.iucn_ids, int):
-        args.iucn_ids = tropical_mammals['iucn_id'].iloc[ : args.iucn_ids].to_list()
-    print(f'\nPredicting over {len(args.iucn_ids)} species with {len(models)} resamples')
+        if args.continue_from_prev_run:
+            prev_run_df = pd.read_csv(args.results_save_fp)
+            tropical_mammals = tropical_mammals[~tropical_mammals['iucn_id'].isin(prev_run_df['species'].unique())]
+        args.iucn_ids = tropical_mammals['iucn_id'].iloc[ : min(args.iucn_ids, len(tropical_mammals))].to_list()
+                             
+    print(f'\nPredicting over {"next " if args.continue_from_prev_run else ""}{len(args.iucn_ids)} species with {len(models)} resamples')
 
     # Reading the tropical forest extent polygon for masking non-forest pixels
     tropical_zone = gpd.read_file(args.tropical_zone_fp)
@@ -334,6 +349,10 @@ def calculate_resampled_aoh_stats(args, models, tropical_mammals, predictor_stac
 
     #  turn the AOH stats data into a proper dataframe
     resampled_aoh_stats = pd.DataFrame(chain(*all_aoh_stats))
+
+    #  adding onto the running dataframe, if using previous results
+    if args.continue_from_prev_run:
+        resampled_aoh_stats = pd.concat((prev_run_df, resampled_aoh_stats), axis = 0, ignore_index = True)
 
     return resampled_aoh_stats
 
@@ -369,7 +388,7 @@ def main(params, mode):
     # Calculate resampled AOH stats using the resampled models + save to CSV
     resampled_aoh_stats = calculate_resampled_aoh_stats(args, models, tropical_mammals, predictor_stack, 
                                                         mammals_data)
-    resampled_aoh_stats.to_csv(os.path.join(args.hunting_preds_dir, f'effective_aoh_info_RESAMPLED_{params["model_to_use"]}{"_just-tropical-forest" if args.just_tropical_forest else ""}{"_no-increase" if args.no_increase else ""}{"_hybrid" if args.hybrid_hab_map else ""}.csv'), index = False)
+    resampled_aoh_stats.to_csv(args.results_save_fp, index = False)
 
 if __name__ == '__main__':
     # Read in parameters
