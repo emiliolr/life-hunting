@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import glob
+import pickle
 from itertools import chain
 
 import numpy as np
@@ -29,6 +30,9 @@ def get_args(params, mode):
 
     #  params for bootstrapping
     args.num_resamples = params['num_resamples']
+    args.retrain_models = bool(params['retrain_models'])
+    args.run_model_proj = bool(params['run_model_proj'])
+    args.model_save_dir = filepaths['model_save_dir']
 
     #  params for reading the dataset
     args.gdrive = True if (mode == 'local') else False
@@ -61,7 +65,7 @@ def get_args(params, mode):
     args.hum_abs_aoh_dir = filepaths['human_absent_aoh_dir'] % (filepaths['hybrid_dir'] if args.hybrid_hab_map else filepaths['non_hybrid_dir'])
 
     args.iucn_ids = params['iucn_id_subset']
-    args.apply_standardization = True
+    args.apply_standardization = False # we're going to do this model-by-model
 
     #  params for collecting AOH stats
     args.no_increase = params['no_increase']
@@ -113,22 +117,41 @@ def resample_dataset(data, args):
     return all_res_idxs
 
 def train_resampled_models(data, resample_idxs, args):
-    # Loop through the data resamples + train a model for each
+    # Checking to see what's already been trained
+    file_pattern = os.path.join(args.model_save_dir, f'rf-3part_{args.time_budget_mins}_*.pkl')
+    model_fps = glob.glob(file_pattern)
+
+    #  case where we're retaining: loop through the data resamples + train a model for each
     all_models = []
-    for i, r in enumerate(resample_idxs):
-        print(f'  training model {i}')
-        data_res = data.iloc[r].copy(deep = True).reset_index(drop = True)
-        trained_model = setup_and_train_model(args, data_res)
-        all_models.append(trained_model)
+    if args.retrain_models:
+        resample_idxs = resample_idxs[len(model_fps) : ] # only training models that we don't already have
+
+        for i, r in zip(range(len(model_fps), args.num_resamples), resample_idxs):
+            print(f'  training model {i}')
+
+            data_res = data.iloc[r].copy(deep = True).reset_index(drop = True)
+            trained_model = setup_and_train_model(args, data_res)
+            trained_model.resampled_idxs = r
+
+            #  adding to our running list + saving to file
+            all_models.append(trained_model)
+            fp = os.path.join(args.model_save_dir, f'rf-3part_{args.time_budget_mins}_{i}.pkl')
+            with open(fp, 'wb') as f:
+                pickle.dump(trained_model, f)
+
+    #  case where we're retrieving: get existing pre-trained model saves
+    else:
+        assert len(model_fps) >= args.num_resamples, 'Didn\'t find enough saved models for the requested number of resamples'
+
+        for i in range(args.num_resamples):
+            with open(model_fps[i], 'rb') as f:
+                model = pickle.load(f)
+                all_models.append(model)
 
     return all_models
 
 def apply_all_models_one_species(species, tropical_mammals, predictor_stack, tropical_zone, mammals_data, model_list,
                                  aoh_dir, hybrid_hab_map):
-    # Get the species' name + body mass
-    species_row = tropical_mammals[tropical_mammals['iucn_id'] == species]
-    species_bm = species_row['combine_body_mass'].iloc[0]
-
     # Reading in the relevant AOH
     if hybrid_hab_map:
         aoh_poss_fps = glob.glob(os.path.join(aoh_dir, f'aoh_T{species}A*_RESIDENT.tif'))
@@ -186,21 +209,33 @@ def apply_all_models_one_species(species, tropical_mammals, predictor_stack, tro
 
     # Putting data in a Pandas DataFrame so the predict function of the hurdle model can grab the right vars
     predictors_tabular_no_nan = pd.DataFrame(predictors_tabular_no_nan, columns = list(predictor_stack_clipped.keys()))
-
-    #  TODO: could wait to do normalization until here!
-
-    #  adding the same standardized body mass value to each row
-    bm = mammals_data['Body_Mass']
-    bm_mean, bm_std = bm.mean(), bm.std()
-    species_bm = (species_bm - bm_mean) / bm_std
-
-    predictors_tabular_no_nan['Body_Mass'] = species_bm
-
-    #  apply the trained hurdle model to each pixel iteratively
-    #   TODO: probably more space-efficient if this isn't held in a last, maybe xarray stack?
-    pred_list = []
+    
+    # Applying all resampled models one by one (each applies their own normalization to data)
+    pred_list = [] # TODO: probably more space-efficient if this isn't held in a last, maybe xarray stack?
     for model in model_list:
-        pred = model.predict(predictors_tabular_no_nan)
+        #  getting a copy of the prediction data + the resampled training data for stats
+        predictors_tabular_no_nan_i = predictors_tabular_no_nan.copy(deep = True)
+        mammals_data_i = mammals_data.iloc[model.resampled_idxs].copy(deep = True).reset_index(drop = True)
+
+        #  normalizing the spatial predictors
+        for c in predictors_tabular_no_nan_i.columns:
+            if c == 'Protected_Area':
+                continue
+
+            c_mean, c_std = float(mammals_data_i[c].mean()), float(mammals_data_i[c].std())
+            predictors_tabular_no_nan_i[c] = ((predictors_tabular_no_nan_i[c] - c_mean) / c_std)
+
+        #  adding the same standardized body mass value to each row
+        bm = mammals_data_i['Body_Mass']
+        bm_mean, bm_std = bm.mean(), bm.std()
+
+        species_bm = tropical_mammals[tropical_mammals['iucn_id'] == species]['combine_body_mass'].iloc[0]
+        species_bm = (species_bm - bm_mean) / bm_std
+
+        predictors_tabular_no_nan_i['Body_Mass'] = species_bm
+
+        #  apply the trained hurdle model to each pixel iteratively
+        pred = model.predict(predictors_tabular_no_nan_i)
 
         #  putting the dataset all back together in a predicted raster
         pred_tabular = np.empty(shape = predictors_tabular.shape[0])
@@ -314,16 +349,17 @@ def main(params, mode):
     resample_idxs = resample_dataset(data, args)
 
     # Train a model for each resampled version of the dataset
-    print(f'Training bootstrapped models ({args.time_budget_mins} min)')
+    print(f'{"Training" if args.retrain_models else "Retrieving"} bootstrapped models ({args.time_budget_mins} min)')
     models = train_resampled_models(data, resample_idxs, args)
 
-    # Read the predictor stack (need to also read training data to normalize vars)
-    #  TODO: predictor stack realistically should be re-normalized for each model, 
-    #        since they'll each have seen different stats for the dataset (AND same 
-    #        for BM values...)
-    mammals_data = pd.read_csv(args.mammals_data_fp)
+    #  exiting early if not doing model projection
+    if not args.run_model_proj:
+        print('\nSkipping model projection')
+        sys.exit()
 
+    # Read the predictor stack + training data to normalize vars
     print('\nReading predictor stack')
+    mammals_data = pd.read_csv(args.mammals_data_fp).reset_index(drop = True)
     predictor_stack = read_predictor_stack(args.predictor_stack_fp, args.model_to_use, mammals_data, 
                                            args.apply_standardization)
 
