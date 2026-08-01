@@ -45,7 +45,7 @@ def get_args(params, mode):
     assert params['model_to_use'] == 'rf-3part', 'Only the three-part RF model is supported for study-level bootstrapping'
     args.model_to_use = 'FLAML_three_part'
     args.flaml_single_model = ['rf']
-    args.time_budget_mins = 1
+    args.time_budget_mins = 0.01
     args.trait_null = False
 
     args.rebalance_dataset = False
@@ -286,7 +286,7 @@ def get_aoh_stats_one_species(args, species, tropical_mammals, predictor_stack, 
     current_aoh_total = float(current_aoh.sum())
 
     aoh_stats = []
-    for current_hp, human_absent_hp in zip(cur_hp_maps, hum_abs_hp_maps):
+    for i, (current_hp, human_absent_hp) in enumerate(zip(cur_hp_maps, hum_abs_hp_maps)):
         #  optionally, capping RRs at 1 (no change)
         if args.no_increase:
             current_hp = current_hp.clip(max = 1)
@@ -316,7 +316,8 @@ def get_aoh_stats_one_species(args, species, tropical_mammals, predictor_stack, 
                     'human_absent_aoh_total' : human_absent_aoh_total,
                     'current_aoh_total' : current_aoh_total, 
                     'human_absent_aoh_w_hunting_total' : human_absent_aoh_w_hunting_total,
-                    'current_aoh_w_hunting_total' : current_aoh_w_hunting_total}
+                    'current_aoh_w_hunting_total' : current_aoh_w_hunting_total, 
+                    'model' : i}
         aoh_stats.append(aoh_dict)
     
     return aoh_stats
@@ -376,7 +377,7 @@ def main(params, mode):
         print('\nSkipping model projection')
         sys.exit()
 
-    # Read the predictor stack + training data to normalize vars
+    # Read the predictor stack + training data (w/PCA pre-computed) to normalize vars
     print('\nReading predictor stack')
     mammals_data = pd.read_csv(args.mammals_data_fp).reset_index(drop = True)
     predictor_stack = read_predictor_stack(args.predictor_stack_fp, args.model_to_use, mammals_data, 
